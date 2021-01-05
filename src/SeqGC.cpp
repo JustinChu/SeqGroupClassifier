@@ -42,7 +42,7 @@ void printVersion()
 void printHelpDialog()
 {
 	const char dialog[] =
-	"Usage: "PROGRAM" [OPTION]... [FILES]...\n"
+	"Usage: " PROGRAM " [OPTION]... [FILES]...\n"
 	"The input is expected to be a set of FASTA files\n\n"
 	"  -h, --help             Display this dialog.\n"
 	"  -v, --verbose          Display verbose output.\n"
