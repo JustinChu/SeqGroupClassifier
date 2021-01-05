@@ -1,1 +1,1 @@
-# KmerClassifier
+# Sequence Group Classifierd
