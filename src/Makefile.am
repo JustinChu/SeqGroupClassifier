@@ -1,13 +1,13 @@
-bin_PROGRAMS = kc
+bin_PROGRAMS = seqgc
 
-kc_CXXFLAGS = $(AM_CXXFLAGS) $(OPENMP_CXXFLAGS)
+seqgc_CXXFLAGS = $(AM_CXXFLAGS) $(OPENMP_CXXFLAGS)
 
-kc_CPPFLAGS = -I$(top_srcdir)/src \
+seqgc_CPPFLAGS = -I$(top_srcdir)/src \
 	-I$(top_srcdir)/vendor \
 	-I$(top_srcdir)
 		
-kc_LDFLAGS = $(OPENMP_CXXFLAGS) \
+seqgc_LDFLAGS = $(OPENMP_CXXFLAGS) \
 	-lz \
 	-pthread
 
-kc_SOURCES = KmerClassifier.cpp
+seqgc_SOURCES = SeqGC.cpp
