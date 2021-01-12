@@ -18,5 +18,7 @@
 namespace opt {
 int verbose = 0;
 int k = 31;
+int hashNum = 1;
+uint64_t bfSize;
 }
 #endif
