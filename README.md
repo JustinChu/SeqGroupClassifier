@@ -1,1 +1,1 @@
-# Sequence Group Classifierd
+# Sequence Group Classifier
