@@ -1,5 +1,7 @@
 /*
- * util.h
+ * Util.h
+ *
+ * funct
  *
  *  Created on: Oct. 16, 2020
  *      Author: cjustin
@@ -22,6 +24,15 @@ static bool fexists(const string &filename) {
 	ifile.close();
 	return good;
 }
+
+/*
+ * Upper triangular matrix to array conversion
+ */
+static unsigned matToIndex(unsigned i, unsigned j, unsigned n) {
+	return ((n * (n - 1) / 2) - (n - i) * ((n - i) - 1) / 2 + j - i - 1);
+}
+
+
 }
 
 #endif /* SRC_UTIL_H_ */
