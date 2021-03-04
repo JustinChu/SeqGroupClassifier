@@ -14,9 +14,18 @@ my $line = $fh->getline();
 while ($line) {
 	chomp($line);
 	my @tempArr = split( /#/, $line );
-#	my $tmpFH   = new IO::File( $1 , "w" );
-#	$tmpFH->write($)
+
+	#	my $tmpFH   = new IO::File( $1 , "w" );
+	#	$tmpFH->write($)
 	my $cmd = 'echo "' . $tempArr[2] . '" >> ' . $tempArr[0] . '.bed';
+	if ( $tempArr[1] eq '1' ) {
+		$cmd =
+		  'echo "' . $tempArr[2] . '" >> ' . $tempArr[0] . '.paternal' . '.bed';
+	}
+	elsif ( $tempArr[1] eq '2' ) {
+		$cmd =
+		  'echo "' . $tempArr[2] . '" >> ' . $tempArr[0] . '.maternal' . '.bed';
+	}
 	system($cmd);
 	$line = $fh->getline();
 }
