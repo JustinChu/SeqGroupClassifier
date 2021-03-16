@@ -17,8 +17,10 @@
  */
 namespace opt {
 int verbose = 0;
-int k = 31;
+unsigned k = 31;
 int hashNum = 1;
 uint64_t bfSize;
+int threads = 1;
+std::string bf = "";
 }
 #endif

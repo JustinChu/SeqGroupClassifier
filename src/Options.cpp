@@ -10,9 +10,11 @@ using namespace std;
 
 namespace opt {
 extern int verbose;
-extern int k;
+extern unsigned k;
 extern int hashNum;
 extern uint64_t bfSize;
+extern int threads;
+extern string bf;
 }
 
 

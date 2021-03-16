@@ -32,6 +32,17 @@ static unsigned matToIndex(unsigned i, unsigned j, unsigned n) {
 	return ((n * (n - 1) / 2) - (n - i) * ((n - i) - 1) / 2 + j - i - 1);
 }
 
+///*
+// * generic hash function
+// */
+//static long murmur64(long h) {
+//	h ^= h >> 33;
+//	h *= 0xff51afd7ed558ccdL;
+//	h ^= h >> 33;
+//	h *= 0xc4ceb9fe1a85ec53L;
+//	h ^= h >> 33;
+//	return h;
+//}
 
 }
 
