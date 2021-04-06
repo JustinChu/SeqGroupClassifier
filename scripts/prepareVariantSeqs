@@ -85,7 +85,7 @@ $(name)_haplotype.bed : $(name)_haplotype.txt
 
 #extract from freeze-1 assemblies using seqtk
 $(name).fa : $(name)_haplotype.bed
-	ls $(name)_haplotype_beds/*.fa.gz | xargs -I % sh -c 'seqtk subseq % $<' > $@
+	ls $(haplotypePath)/*.fa.gz | xargs -I % sh -c 'seqtk subseq % $<' > $@
 	
 
  
