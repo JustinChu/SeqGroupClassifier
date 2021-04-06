@@ -5,6 +5,9 @@ use strict;
 use diagnostics;
 use IO::File;
 
+
+my $divThresh = $ARGV[1];
+
 #TODO preserve allele order information?
 
 #HERV-C4	6387	0	6387	+	HG01978#2#h2tg000049l:2468298-2626522	158225	52002	58389	6385	6387	0	NM:i:2	ms:i:6367	AS:i:6367	nn:i:0	tp:A:S	cm:i:632	s1:i:6331	de:f:0.0003	rl:i:0	cg:Z:6387M
@@ -16,20 +19,24 @@ my %sampleAlleles;
 
 my $fh      = new IO::File( $ARGV[0], "r" );
 my $line    = $fh->getline();
-my @tempArr = split( /\t/, $line );
-
-#my @currentSampInfo = split(/#/,$tempArr[5]);
-#my $currentID = $tempArr[5];
-$alleles{ $tempArr[0] } += 1;
-$sampleAlleles{ $tempArr[5] }->{ $tempArr[0] } += 1;
-
-$line = $fh->getline();
 
 while ($line) {
 	chomp($line);
-	@tempArr = split( /\t/, $line );
-	$alleles{ $tempArr[0] } += 1;
-	$sampleAlleles{ $tempArr[5] }->{ $tempArr[0] } += 1;
+	my @tempArr = split( /\t/, $line );
+	my $divergence = 1;
+	#e.g. de:f:0.0003	
+	for(my $i =  12; $i < scalar(@tempArr); ++$i){
+		if($tempArr[$i] =~ /^de:f:([^\:]+)/)
+		{
+			$divergence = $1;
+		}
+	}
+	#de:f:0.0003
+	if($divThresh > $divergence){
+		print STDERR $line . "\n";
+		$alleles{ $tempArr[0] } += 1;
+		$sampleAlleles{ $tempArr[5] }->{ $tempArr[0] } += 1;
+	}
 	$line = $fh->getline();
 }
 $fh->close();
