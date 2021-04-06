@@ -23,7 +23,7 @@ while ($line) {
 		print $chr . "\t" . $start . "\t" . $end  . "\t*\t\t0\t" . $direction . "\n";
 	}
 	else{
-		die "failed to parse $line\n";
+		die "failed to parse: $line\n";
 	}
 	$line = $fh->getline();
 }
