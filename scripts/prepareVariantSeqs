@@ -44,8 +44,8 @@ check-params: check-name-param
 ifndef geneName
 	$(error missing required param 'geneName' (name of gene to extract))
 endif
-ifndef masterBed
-	$(error missing required param 'masterBed' (path to reference bed))
+ifndef bubbleBed
+	$(error missing required param 'bubbleBed' (path to reference bed))
 endif
 #ifndef gtf
 #	$(error missing required param 'gtf' (path to gtf used in background sequence))
@@ -54,7 +54,7 @@ ifndef gtfBed
 	$(error missing required param 'gtfBed' (path to gtfBed reference annotation))
 endif
 ifndef haplotypePath
-	$(error missing required param 'haplotypePaths' (path to each reference genomes))
+	$(error missing required param 'haplotypePath' (path to each reference genomes))
 endif
 
 #------------------------------------------------------------
@@ -73,7 +73,7 @@ $(name)_ref.bed: $(gtfBed)
 	
 #use bed file to find bubbles
 $(name)_bubble.bed: $(name)_ref.bed
-	tabix $(masterBed) -R $< | awk '{print $1"\t"$2"\t"$3}' | sort | uniq > $@
+	tabix $(bubbleBed) -R $< | awk '{print $1"\t"$2"\t"$3}' | sort | uniq > $@
 
 #extract regions from each haplotype path bed
 $(name)_haplotype.txt : $(name)_bubble.bed $(haplotypePath)
