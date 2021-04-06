@@ -73,7 +73,7 @@ $(name)_ref.bed: $(gtfBed)
 	
 #use bed file to find bubbles
 $(name)_bubble.bed: $(name)_ref.bed
-	tabix $(bubbleBed) -R $< | awk '{print $1"\t"$2"\t"$3}' | sort | uniq > $@
+	tabix $(bubbleBed) -R $< | awk '{print \$1"\t"\$2"\t"\$3}' | sort | uniq > $@
 
 #extract regions from each haplotype path bed
 $(name)_haplotype.txt : $(name)_bubble.bed $(haplotypePath)
