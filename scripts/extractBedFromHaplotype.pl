@@ -22,6 +22,9 @@ while ($line) {
 		my $end = $4;
 		print $chr . "\t" . $start . "\t" . $end  . "\t*\t\t0\t" . $direction . "\n";
 	}
+	else if($line =~ /\.?/){{
+		
+	}
 	else{
 		die "failed to parse: $line\n";
 	}
