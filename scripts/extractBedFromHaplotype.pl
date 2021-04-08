@@ -22,7 +22,7 @@ while ($line) {
 		my $end = $4;
 		print $chr . "\t" . $start . "\t" . $end  . "\t*\t\t0\t" . $direction . "\n";
 	}
-	elsif($line =~ /\.?/){{
+	elsif($line =~ /\.?/){
 		
 	}
 	else{
