@@ -134,7 +134,6 @@ public:
 			kseq_destroy(seq);
 			gzclose(fp);
 
-
 			if (m_sampleCounts.at(id) > 1) {
 				unsigned matSize = (m_sampleCounts.at(id)
 						* (m_sampleCounts.at(id) - 1)) / 2;
@@ -152,17 +151,27 @@ public:
 				for (SeqGroupBuilder::GroupHash::iterator itr =
 						uniqueEntries.begin(); itr != uniqueEntries.end();
 						++itr) {
-					for (unsigned i = 0; i < m_sampleCounts.at(id); ++i) {
-						if (itr->second->at(i).m_count != 0) {
-							for (unsigned j = i + 1; j < m_sampleCounts.at(id);
-									++j) {
-								if (itr->second->at(j).m_count
-										== itr->second->at(i).m_count) {
-									++countMat[Util::matToIndex(i, j,
-											m_sampleCounts.at(id))];
+					uint16_t lastCount = itr->second->at(0).m_count;
+					bool allSame = true;
+					for (unsigned i = 1; i < m_sampleCounts.at(id); ++i) {
+						if(itr->second->at(i).m_count != lastCount){
+							allSame = false;
+							break;
+						}
+					}
+					if (!allSame) {
+						for (unsigned i = 0; i < m_sampleCounts.at(id); ++i) {
+							if (itr->second->at(i).m_count != 0) {
+								for (unsigned j = i + 1;
+										j < m_sampleCounts.at(id); ++j) {
+									if (itr->second->at(j).m_count
+											== itr->second->at(i).m_count) {
+										++countMat[Util::matToIndex(i, j,
+												m_sampleCounts.at(id))];
+									}
 								}
+								++groupCounts[i];
 							}
-							++groupCounts[i];
 						}
 					}
 				}
@@ -174,7 +183,6 @@ public:
 					distMat[i] = 0;
 				}
 
-				//print out count matrix information
 				for (unsigned i = 0; i < m_sampleCounts.at(id); ++i) {
 					for (unsigned j = i + 1; j < m_sampleCounts.at(id); ++j) {
 
@@ -199,6 +207,9 @@ public:
 
 				//output matrix
 				printMatrix(distMat,ids, m_filenames[id] + ".mat.tsv");
+
+				//output sample to matrix table
+				printTable(uniqueEntries,ids, m_filenames[id] + ".count.tsv");
 			}
 
 		}
@@ -247,6 +258,51 @@ private:
 			out << "\n";
 		}
 	}
+
+	/*
+	 * prints to file a tab separated distance matrix
+	 */
+	void printTable(const SeqGroupBuilder::GroupHash &uniqueEntries,
+			const vector<string> &ids, string outputFilename) const {
+		ofstream out(outputFilename.c_str());
+		out << "sample";
+		size_t count = 0;
+		for (SeqGroupBuilder::GroupHash::const_iterator itr =
+				uniqueEntries.begin(); itr != uniqueEntries.end(); ++itr) {
+			uint16_t lastCount = itr->second->at(0).m_count;
+			bool allSame = true;
+			for (unsigned i = 1; i < itr->second->size(); ++i) {
+				if (itr->second->at(i).m_count != lastCount) {
+					allSame = false;
+					break;
+				}
+			}
+			if (!allSame) {
+				out << "," << count++;
+			}
+		}
+		out << "\n";
+
+		for (unsigned i = 0; i < ids.size(); ++i) {
+			out << ids.at(i);
+			for (SeqGroupBuilder::GroupHash::const_iterator itr =
+					uniqueEntries.begin(); itr != uniqueEntries.end(); ++itr) {
+				uint16_t lastCount = itr->second->at(0).m_count;
+				bool allSame = true;
+				for (unsigned i = 1; i < itr->second->size(); ++i) {
+					if (itr->second->at(i).m_count != lastCount) {
+						allSame = false;
+						break;
+					}
+				}
+				if (!allSame) {
+					out << "," << itr->second->at(i).m_count;
+				}
+			}
+			out << "\n";
+		}
+	}
+
 
 
 };
