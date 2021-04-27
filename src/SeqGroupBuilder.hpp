@@ -260,7 +260,7 @@ private:
 	}
 
 	/*
-	 * prints to file a tab separated distance matrix
+	 * prints to file a tab separated matrix of k-mer counts
 	 */
 	void printTable(const SeqGroupBuilder::GroupHash &uniqueEntries,
 			const vector<string> &ids, string outputFilename) const {
@@ -269,7 +269,7 @@ private:
 		size_t count = 0;
 		for (SeqGroupBuilder::GroupHash::const_iterator itr =
 				uniqueEntries.begin(); itr != uniqueEntries.end(); ++itr) {
-			uint16_t lastCount = itr->second->at(0).m_count;
+			opt::Count lastCount = itr->second->at(0).m_count;
 			bool allSame = true;
 			for (unsigned i = 1; i < itr->second->size(); ++i) {
 				if (itr->second->at(i).m_count != lastCount) {
@@ -287,7 +287,7 @@ private:
 			out << ids.at(i);
 			for (SeqGroupBuilder::GroupHash::const_iterator itr =
 					uniqueEntries.begin(); itr != uniqueEntries.end(); ++itr) {
-				uint16_t lastCount = itr->second->at(0).m_count;
+				opt::Count lastCount = itr->second->at(0).m_count;
 				bool allSame = true;
 				for (unsigned i = 1; i < itr->second->size(); ++i) {
 					if (itr->second->at(i).m_count != lastCount) {

@@ -16,6 +16,9 @@
  * execution of the program.
  */
 namespace opt {
+
+typedef uint16_t Count;
+
 int verbose = 0;
 unsigned k = 31;
 int hashNum = 1;
