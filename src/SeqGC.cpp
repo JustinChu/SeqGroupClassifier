@@ -58,10 +58,10 @@ void printBuildDialog(){
 //	"Usage: " PROGRAM " build [OPTION]... [FASTA]...\n"
 	"Usage: " PROGRAM " [OPTION]... [FASTA]...\n"
 	"  -p, --prefix           Output name prefix. [required]\n"
-	"  -g, --groups           File outlining groupings\n"
-	"  -i, --input            Input sequences to classify\n"
+	"  -g, --groups           File outlining groupings.\n"
+	"  -i, --input            Input sequences to classify.\n"
 //	"  -t, --threads          Number of threads to run.[1]\n"
-	"  -b, --bg_bloom         Bloom filter of background sequences.[required]\n"
+	"  -b, --bg_bloom         Bloom filter of background sequences. [required]\n"
 	"  -h, --help             Display this dialog.\n"
 	"  -v, --verbose          Display verbose output.\n"
 	"      --version          Print version information.\n";
