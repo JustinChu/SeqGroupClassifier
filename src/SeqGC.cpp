@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 		NULL, 0, NULL, 0 } };
 
 	int option_index = 0;
-	while ((c = getopt_long(argc, argv, "p:g:t:vhb:", long_options,
+	while ((c = getopt_long(argc, argv, "p:g:i:t:vhb:", long_options,
 			&option_index)) != -1)
 	{
 		istringstream arg(optarg != NULL ? optarg : "");
