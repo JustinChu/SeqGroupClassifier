@@ -4,18 +4,6 @@
  *  Created on: Apr 21, 2021
  *      Author: cjustin
  */
-
-//General plan
-//load in group file
-//load in k-mer profiles tsl::robin_map<uint64_t, shared_ptr<vector<Entry>>> GroupHash
-//create profile
-//vector of doubles with k-mer frequency/ number of samples
-//for each entry in group sum frequency/
-//1) compute total number of k-mers
-//2) compute frequencyMatrix
-//3) for each k-mer take sum of counts and divide by total number
-//4) load into matrix tsl::robin_map<uint64_t, shared_ptr<vector<double>>>
-//5) compute running KL distance (w/ Kahan summation algorithm?)
 #ifndef SRC_SEQGROUPCLASSIFIER_HPP_
 #define SRC_SEQGROUPCLASSIFIER_HPP_
 
@@ -24,26 +12,82 @@
 #include <omp.h>
 #include <stdio.h>
 #include <math.h>
-#include "vendor/tsl/robin_map.h"
+#include <fstream>
+
 #include "Options.h"
 
-//#include "vendor/tsl/robin_set.h"
+#include "vendor/tsl/robin_map.h"
+#include "vendor/btl_bloomfilter/BloomFilter.hpp"
+#include "vendor/ntHash/ntHashIterator.hpp"
+#include "vendor/kseq.h"
+
+#ifndef KSEQ_INIT_NEW
+#define KSEQ_INIT_NEW
+#include <zlib.h>
+#include "vendor/kseq.h"
+KSEQ_INIT(gzFile, gzread)
+#endif /*KSEQ_INIT_NEW*/
 
 using namespace std;
 
 class SeqGroupClassifier {
 public:
 
+	// A hash function used to hash a pair of any kind
+	struct HashPair {
+	    template <class T1, class T2>
+	    size_t operator()(const pair<T1, T2>& p) const
+	    {
+	        auto hash1 = hash<T1>{}(p.first);
+	        auto hash2 = hash<T2>{}(p.second);
+	        return hash1 ^ hash2;
+	    }
+	};
+
 	typedef uint16_t GroupID; //index of vector described by m_groupIDs
 	typedef uint16_t SampleID; //index of vector described by m_groupIDs
-	typedef tsl::robin_map<uint64_t, uint32_t> indexHash; //indexes the matrix used
+	typedef uint32_t IndexPos;
+	typedef tsl::robin_map<uint64_t, IndexPos> indexHash; //indexes the matrix used
 	typedef tsl::robin_map<uint64_t, shared_ptr<vector<opt::Count>>> CountHash; //input vector converted to matrix
+	typedef tsl::robin_map<pair<GroupID, GroupID>, double, HashPair> ResultsHash;
 
-	SeqGroupClassifier(const CountHash &counts, const vector<string> &sampleIDs,
-			const vector<string> &groupIDs,
-			const vector<vector<GroupID>> &groupings) :
-			m_groupIDs(groupIDs), m_sampleIDs(sampleIDs), m_groupings(
-					groupings), m_hashToIndex() {
+
+	SeqGroupClassifier(const CountHash &counts, const vector<string> &sampleIDs) :
+			m_sampleIDs(sampleIDs) {
+		//create reverse hashtable for sampleIDs
+		for(SampleID i = 0; i < m_sampleIDs.size(); ++i){
+			m_idToSample[m_sampleIDs[i]] = i;
+		}
+
+		//parse and load groups file
+		string line;
+		ifstream gfh(opt::groupingsFile);
+		if (gfh.is_open()) {
+			while (getline(gfh, line)) {
+				std::string delimiter = "\t";
+				size_t pos = line.find(delimiter);
+				std::string token;
+
+				string sampleName = line.substr(0, pos);
+
+				//move to last part of string (where group ID lives)
+				while ((pos = line.find(delimiter)) != std::string::npos) {
+				    token = line.substr(0, pos);
+				    std::cout << token << std::endl;
+					line.erase(0, pos + delimiter.length());
+				}
+				if (m_groupIDs.back() != line) {
+					m_groupings.push_back(shared_ptr<vector<GroupID>>(
+							new vector<GroupID>()));
+					m_groupIDs.push_back(line);
+				}
+				m_groupings.back()->push_back(m_idToSample[sampleName]);
+			}
+			gfh.close();
+		}
+		else {
+			cout << "Unable to open file";
+		}
 		computeGroupFreq(counts);
 	}
 
@@ -62,7 +106,7 @@ public:
 			uint16_t lastCount = i->second->at(0);
 			bool allSame = true;
 			for (unsigned j = 1; j < m_sampleIDs.size(); ++j) {
-				if(i->second->at(j) != lastCount){
+				if (i->second->at(j) != lastCount) {
 					allSame = false;
 					break;
 				}
@@ -73,8 +117,9 @@ public:
 				m_hashToIndex[i->first] = freqMatSize++;
 				//assign count of all k-mers to group
 				for (size_t j = 0; j != m_groupings.size(); ++j) {
-					for (vector<GroupID>::const_iterator k = m_groupings[j].begin();
-							k != m_groupings[j].end(); ++j) {
+					for (vector<GroupID>::const_iterator k =
+							m_groupings[j]->begin(); k != m_groupings[j]->end();
+							++j) {
 						totalCounts[j] += i->second->at(*k);
 					}
 				}
@@ -83,8 +128,8 @@ public:
 		//set size of vectors
 		for (unsigned i = 0; i < m_sampleIDs.size(); ++i) {
 			m_groupFreq.push_back(
-					shared_ptr<vector<opt::Count>>(
-							new vector<opt::Count>(freqMatSize, 0)));
+					shared_ptr<vector<double>>(
+							new vector<double>(freqMatSize, 0)));
 		}
 
 		//populate matrix
@@ -96,7 +141,7 @@ public:
 				for (size_t j = 0; j != m_groupings.size(); ++j) {
 					uint64_t countOfGroup = 0;
 					for (vector<GroupID>::const_iterator k =
-							m_groupings[j].begin(); k != m_groupings[j].end();
+							m_groupings[j]->begin(); k != m_groupings[j]->end();
 							++j) {
 						countOfGroup += i->second->at(*k);
 					}
@@ -107,39 +152,36 @@ public:
 		}
 	}
 
-//	/*
-//	 * Creates combination of each group frequencies
-//	 * Intended to blend multiple profiles together for diploid genomes
-//	 */
-//	void createCombFreq() {
-//
-//	}
-
-//	/*
-//	 * Combines the frequency of 2 vectors of counts
-//	 */
-//	vector<double> combineFrequency(const vector<double> &mat1,
-//			const vector<double> &mat2) {
-//
-//	}
-
 	/*
-	 * Assuming diploid genome compute KL distances metric
+	 * Runs all combinations of diploid genotypes
+	 * Results pairs are cannonically pair1 <= pair2
 	 */
-	double computeKLDist(const vector<double> &parent1,
-			const vector<double> &parent2,
-			const vector<double> &sampleFreq) {
-		double dist = 0.0;
-		for (size_t i = 0; i < sampleFreq.size(); ++i) {
-			double blendedFreq = (parent1[i] + parent2[i]) / 2.0;
-			//using base 2 log, so units use are "bits" rather than "nats" (base e)
-			double subDist = sampleFreq[i] * log2(sampleFreq[i] / blendedFreq);
-			dist += subDist;
+	ResultsHash computeAllKLDist(
+			const string &filename) {
+		ResultsHash results;
+		assert(filename.empty());
+		//iterate through all combinations
+		for(GroupID i= 0; i < m_groupIDs.size(); ++i){
+			for (GroupID j = i; j < m_groupIDs.size(); ++j) {
+				vector<double> sampleFreq = loadSeqsToFreq(filename);
+				results[std::make_pair(i, j)] = computeKLDist(
+						*m_groupFreq[i], *m_groupFreq[j], sampleFreq);
+			}
 		}
-		return(dist);
+		//for each compute kl distance
+		//return results
+		return results;
 	}
 
-//	double computeML(){
+//	double computeML(const vector<double> &parent1,
+//			const vector<double> &parent2,
+//			const vector<double> &sampleFreq){
+//		double prob = 0.0;
+//		for (size_t i = 0; i < sampleFreq.size(); ++i) {
+//			double blendedFreq = (parent1[i] + parent2[i]) / 2.0;
+//
+//		}
+//		return(prob);
 //
 //	}
 
@@ -147,14 +189,85 @@ public:
 //
 //	}
 
-	virtual ~SeqGroupClassifier();
+	 virtual ~SeqGroupClassifier(){
+	 }
+
 private:
-	const vector<string> &m_groupIDs;
 	const vector<string> &m_sampleIDs;
-	const vector<vector<GroupID>> &m_groupings;
+	vector<string> m_groupIDs;
+	tsl::robin_map<string, SampleID> m_idToSample;
+	vector<shared_ptr<vector<GroupID>>> m_groupings;
 //	tsl::robin_map<SampleID, GroupID> &m_sampleToGroup;
-	indexHash &m_hashToIndex; //hashed k-mer value to index
+	indexHash m_hashToIndex; //hashed k-mer value to index
 	vector<shared_ptr<vector<double>>> m_groupFreq;
+
+	/*
+	 * TODO: possible pitfall - currently k-mers are stored as hashvalues rather
+	 * than element itself ad hash collisions could artifically add to counts
+	 */
+	vector<double> loadSeqsToFreq(const string &filename){
+		uint64_t rawCoverage = 0; //total number of k-mers
+		vector<opt::Count> counts(m_groupFreq[0]->size(),0);
+		vector<double> freqs(m_groupFreq[0]->size());
+
+		BloomFilter bf(opt::bf);
+		//read in file
+		gzFile fp;
+		fp = gzopen(filename.c_str(), "r");
+		if (fp == Z_NULL) {
+			std::cerr << "file " << filename << " cannot be opened"
+					<< std::endl;
+			exit(1);
+		} else if (opt::verbose) {
+			std::cerr << "Opening " << filename << std::endl;
+		}
+		kseq_t *seq = kseq_init(fp);
+		int l = kseq_read(seq);
+		unsigned index = 0;
+		while (l >= 0) {
+			//k-merize
+			for (ntHashIterator itr(seq->seq.s, opt::hashNum, opt::k);
+					itr != itr.end(); ++itr) {
+				//remove background k-mers (optional)
+				//if kmer exists inside bg set
+				if (!bf.contains(*itr)) {
+					indexHash::iterator seqIndex = m_hashToIndex.find((*itr)[0]);
+					if(seqIndex != m_hashToIndex.end()){
+						++counts[seqIndex->second];
+						++rawCoverage;
+					}
+				}
+			}
+			l = kseq_read(seq);
+			index++;
+		}
+		kseq_destroy(seq);
+		gzclose(fp);
+
+		//divide counts by coverage
+		for(IndexPos i = 0; i < counts.size(); ++i){
+			freqs[i] = double(counts[i])/double(rawCoverage);
+		}
+
+		//return vector
+		return(freqs);
+	}
+
+	/*
+	 * Assuming diploid genome compute KL distances metric
+	 */
+	double computeKLDist(const vector<double> &parent1,
+			const vector<double> &parent2, const vector<double> &sampleFreq) {
+		double dist = 0.0;
+		for (size_t i = 0; i < sampleFreq.size(); ++i) {
+			double blendedFreq = (parent1[i] + parent2[i]) / 2.0;
+			//using base 2 log, so units use are "bits" rather than "nats" (base e)
+			double subDist = sampleFreq[i] * log2(sampleFreq[i] / blendedFreq);
+			dist += subDist;
+		}
+		return (dist);
+	}
+
 };
 
 #endif /* SRC_SEQGROUPCLASSIFIER_HPP_ */

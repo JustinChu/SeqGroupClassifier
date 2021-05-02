@@ -15,6 +15,9 @@ extern int hashNum;
 extern uint64_t bfSize;
 extern int threads;
 extern string bf;
+extern string outputPrefix;
+extern string groupingsFile;
+extern string readInput;
 }
 
 

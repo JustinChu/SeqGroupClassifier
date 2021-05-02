@@ -10,4 +10,6 @@ seqgc_LDFLAGS = $(OPENMP_CXXFLAGS) \
 	-lz \
 	-pthread
 
-seqgc_SOURCES = SeqGC.cpp
+seqgc_SOURCES = SeqGC.cpp \
+	SeqGroupBuilder.hpp \
+	SeqGroupClassifier.hpp

@@ -117,7 +117,7 @@ public:
 		return counts;
 	}
 
-	void printMatrixes(const CountsHash &counts, ) {
+	void printMatrixes(const CountsHash &counts) {
 		unsigned matSize = (m_sampleIDs.size() * (m_sampleIDs.size() - 1)) / 2;
 
 		//create similarity matrix (jaccard)
@@ -131,7 +131,7 @@ public:
 		//populate count matrix
 		vector<uint64_t> groupCounts(m_sampleIDs.size(), 0);
 
-		for (CountsHash::iterator itr = counts.begin(); itr != counts.end();
+		for (CountsHash::const_iterator itr = counts.begin(); itr != counts.end();
 				++itr) {
 			uint16_t lastCount = itr->second->at(0);
 			bool allSame = true;
@@ -181,6 +181,10 @@ public:
 			//output sample to matrix table
 			printTable(counts, m_sampleIDs, opt::outputPrefix + ".count.tsv");
 		}
+	}
+
+	const vector<string> &getSampleIDs() const{
+		return m_sampleIDs;
 	}
 
 	virtual ~SeqGroupBuilder() {

@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <string>
 
+using namespace std;
+
 /**
  * Global variables that are mostly constant for the duration of the
  * execution of the program.
@@ -24,6 +26,9 @@ unsigned k = 31;
 int hashNum = 1;
 uint64_t bfSize;
 int threads = 1;
-std::string bf = "";
+string bf = "";
+string outputPrefix = "";
+string groupingsFile = "";
+string readInput = "";
 }
 #endif
