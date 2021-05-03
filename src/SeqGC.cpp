@@ -60,6 +60,7 @@ void printBuildDialog(){
 	"  -p, --prefix           Output name prefix. [required]\n"
 	"  -g, --groups           File outlining groupings.\n"
 	"  -i, --input            Input sequences to classify.\n"
+	"  -c, --pseudo_count     KL distance value for smoothing.[0.001]\n"
 //	"  -t, --threads          Number of threads to run.[1]\n"
 	"  -b, --bg_bloom         Bloom filter of background sequences. [required]\n"
 	"  -h, --help             Display this dialog.\n"
@@ -84,6 +85,7 @@ int main(int argc, char *argv[])
 		"prefix", required_argument, NULL, 'p' }, {
 		"groups", required_argument, NULL, 'g' }, {
 		"input", required_argument, NULL, 'i' }, {
+		"pseudo_count", required_argument, NULL, 'c' }, {
 		"threads", required_argument, NULL, 't' }, {
 		"bg_bloom", required_argument, NULL, 'b' }, {
 		"help", no_argument, NULL, 'h' }, {
@@ -92,7 +94,7 @@ int main(int argc, char *argv[])
 		NULL, 0, NULL, 0 } };
 
 	int option_index = 0;
-	while ((c = getopt_long(argc, argv, "p:g:i:t:vhb:", long_options,
+	while ((c = getopt_long(argc, argv, "p:g:i:c:t:vhb:", long_options,
 			&option_index)) != -1)
 	{
 		istringstream arg(optarg != NULL ? optarg : "");
@@ -119,6 +121,15 @@ int main(int argc, char *argv[])
 			stringstream convert(optarg);
 			if (!(convert >> opt::readInput)) {
 				cerr << "Error - Invalid parameter i: "
+						<< optarg << endl;
+				return 0;
+			}
+			break;
+		}
+		case 'c': {
+			stringstream convert(optarg);
+			if (!(convert >> opt::pseudoCount)) {
+				cerr << "Error - Invalid parameter c: "
 						<< optarg << endl;
 				return 0;
 			}
@@ -208,20 +219,9 @@ int main(int argc, char *argv[])
 		SeqGroupClassifier classifier(counts, builder.getSampleIDs());
 		if(!opt::readInput.empty()){
 			if (Util::fexists(opt::readInput)) {
-				SeqGroupClassifier::ResultsHash results =
+				tsl::robin_map<SeqGroupClassifier::GroupID, double> results =
 						classifier.computeAllKLDist(opt::readInput);
-				pair<SeqGroupClassifier::GroupID, SeqGroupClassifier::GroupID> minGroups;
-				double minValue = numeric_limits<double>::max();
-				for (SeqGroupClassifier::ResultsHash::iterator itr =
-						results.begin(); itr != results.end(); ++itr) {
-					if(itr->second < minValue){
-						minValue = itr->second;
-						minGroups = itr->first;
-					}
-				}
-				cout << minValue << "\t" << minGroups.first << "\t"
-						<< minGroups.second << endl;
-
+				classifier.printResults(results);
 			}
 		}
 	}

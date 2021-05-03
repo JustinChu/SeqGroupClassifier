@@ -73,13 +73,16 @@ public:
 				//move to last part of string (where group ID lives)
 				while ((pos = line.find(delimiter)) != std::string::npos) {
 				    token = line.substr(0, pos);
-				    std::cout << token << std::endl;
+//				    std::cout << token << std::endl;
 					line.erase(0, pos + delimiter.length());
 				}
-				if (m_groupIDs.back() != line) {
+				string groupName = line;
+				tsl::robin_map<string, GroupID>::iterator itr = m_idToGroup.find(groupName);
+				if (itr ==  m_idToGroup.end()) {
+					m_idToGroup[groupName] = m_groupings.size();
 					m_groupings.push_back(shared_ptr<vector<GroupID>>(
 							new vector<GroupID>()));
-					m_groupIDs.push_back(line);
+					m_groupIDs.push_back(groupName);
 				}
 				m_groupings.back()->push_back(m_idToSample[sampleName]);
 			}
@@ -116,10 +119,10 @@ public:
 				//add to index
 				m_hashToIndex[i->first] = freqMatSize++;
 				//assign count of all k-mers to group
-				for (size_t j = 0; j != m_groupings.size(); ++j) {
+				for (size_t j = 0; j < m_groupings.size(); ++j) {
 					for (vector<GroupID>::const_iterator k =
 							m_groupings[j]->begin(); k != m_groupings[j]->end();
-							++j) {
+							++k) {
 						totalCounts[j] += i->second->at(*k);
 					}
 				}
@@ -138,39 +141,93 @@ public:
 			indexHash::iterator itr = m_hashToIndex.find(i->first);
 			//k-mer is not the sample in all samples
 			if (itr != m_hashToIndex.end()) {
-				for (size_t j = 0; j != m_groupings.size(); ++j) {
+				for (size_t j = 0; j < m_groupings.size(); ++j) {
 					uint64_t countOfGroup = 0;
 					for (vector<GroupID>::const_iterator k =
 							m_groupings[j]->begin(); k != m_groupings[j]->end();
-							++j) {
+							++k) {
 						countOfGroup += i->second->at(*k);
 					}
-					double freq = double(countOfGroup) / double(totalCounts[j]);
-					(*m_groupFreq[j])[j] = freq;
+					double totalCount = double(totalCounts[j])
+							+ double(
+									m_hashToIndex.size()
+											* m_groupings.at(j)->size())
+									* opt::pseudoCount;
+					double freq = (double(countOfGroup) + opt::pseudoCount)
+							/ totalCount;
+					(*m_groupFreq[j])[itr->second] = freq;
 				}
 			}
 		}
+	}
+
+	tsl::robin_map<GroupID, double> computeAllKLDist(const string &filename){
+		tsl::robin_map<GroupID, double> results;
+		assert(!filename.empty());
+		vector<double> sampleFreq = loadSeqsToFreq(filename);
+		//iterate through all combinations
+		for(GroupID i= 0; i < m_groupIDs.size(); ++i){
+			double result = computeKLDist(
+					*m_groupFreq[i], *m_groupFreq[i],
+					sampleFreq);
+			cerr << m_groupIDs[i] << "\t" << result << endl;
+			results[i] = result;
+		}
+		//for each compute kl distance
+		//return results
+		return results;
 	}
 
 	/*
 	 * Runs all combinations of diploid genotypes
 	 * Results pairs are cannonically pair1 <= pair2
 	 */
-	ResultsHash computeAllKLDist(
+	ResultsHash computeDiploidKLDist(
 			const string &filename) {
 		ResultsHash results;
-		assert(filename.empty());
+		assert(!filename.empty());
+		vector<double> sampleFreq = loadSeqsToFreq(filename);
 		//iterate through all combinations
 		for(GroupID i= 0; i < m_groupIDs.size(); ++i){
 			for (GroupID j = i; j < m_groupIDs.size(); ++j) {
-				vector<double> sampleFreq = loadSeqsToFreq(filename);
-				results[std::make_pair(i, j)] = computeKLDist(
-						*m_groupFreq[i], *m_groupFreq[j], sampleFreq);
+				double result = computeKLDist(
+						*m_groupFreq[i], *m_groupFreq[j],
+						sampleFreq);
+//				cerr << m_groupIDs[i] << "," << m_groupIDs[j] << "\t"
+//						<< m_groupIDs.size() << "\t" << result << endl;
+				results[std::make_pair(i, j)] = result;
 			}
 		}
 		//for each compute kl distance
 		//return results
 		return results;
+	}
+
+	void printResults(ResultsHash results){
+		pair<GroupID, GroupID> minGroups;
+		double minValue = numeric_limits<double>::max();
+		for (SeqGroupClassifier::ResultsHash::iterator itr =
+				results.begin(); itr != results.end(); ++itr) {
+			if(itr->second < minValue){
+				minValue = itr->second;
+				minGroups = itr->first;
+			}
+		}
+		cout << minValue << "\t" << m_groupIDs[minGroups.first] << "\t"
+				<< m_groupIDs[minGroups.second] << endl;
+	}
+
+	void printResults(tsl::robin_map<SeqGroupClassifier::GroupID, double> results){
+		GroupID minGroup = 0;
+		double minValue = numeric_limits<double>::max();
+		for (tsl::robin_map<SeqGroupClassifier::GroupID, double>::iterator itr =
+				results.begin(); itr != results.end(); ++itr) {
+			if(itr->second < minValue){
+				minValue = itr->second;
+				minGroup = itr->first;
+			}
+		}
+		cout << minValue << "\t" << m_groupIDs[minGroup] << endl;
 	}
 
 //	double computeML(const vector<double> &parent1,
@@ -196,6 +253,7 @@ private:
 	const vector<string> &m_sampleIDs;
 	vector<string> m_groupIDs;
 	tsl::robin_map<string, SampleID> m_idToSample;
+	tsl::robin_map<string, GroupID> m_idToGroup;
 	vector<shared_ptr<vector<GroupID>>> m_groupings;
 //	tsl::robin_map<SampleID, GroupID> &m_sampleToGroup;
 	indexHash m_hashToIndex; //hashed k-mer value to index
@@ -244,9 +302,12 @@ private:
 		kseq_destroy(seq);
 		gzclose(fp);
 
+		rawCoverage += double(counts.size()) * opt::pseudoCount;
+
 		//divide counts by coverage
-		for(IndexPos i = 0; i < counts.size(); ++i){
-			freqs[i] = double(counts[i])/double(rawCoverage);
+		for (IndexPos i = 0; i < counts.size(); ++i) {
+			freqs[i] = (double(counts[i]) + opt::pseudoCount)
+					/ double(rawCoverage);
 		}
 
 		//return vector
@@ -256,18 +317,39 @@ private:
 	/*
 	 * Assuming diploid genome compute KL distances metric
 	 */
-	double computeKLDist(const vector<double> &parent1,
-			const vector<double> &parent2, const vector<double> &sampleFreq) {
+	double computeKLDist(const vector<double> &parent, const vector<double> &sampleFreq) const{
 		double dist = 0.0;
 		for (size_t i = 0; i < sampleFreq.size(); ++i) {
-			double blendedFreq = (parent1[i] + parent2[i]) / 2.0;
-			//using base 2 log, so units use are "bits" rather than "nats" (base e)
-			double subDist = sampleFreq[i] * log2(sampleFreq[i] / blendedFreq);
-			dist += subDist;
+//			//check for zero values, if present, remove (TODO: Determine if correct way to handle)
+			if (parent.at(i) && sampleFreq.at(i)) {
+				//using base 2 log, so units use are "bits" rather than "nats" (base e)
+				double subDist = sampleFreq.at(i)
+						* log2(sampleFreq.at(i) / parent.at(i));
+				dist += subDist;
+			}
 		}
 		return (dist);
 	}
 
+	/*
+	 * Assuming diploid genome compute KL distances metric
+	 */
+	double computeKLDist(const vector<double> &parent1,
+			const vector<double> &parent2, const vector<double> &sampleFreq) const{
+		double dist = 0.0;
+		for (size_t i = 0; i < sampleFreq.size(); ++i) {
+			double blendedFreq = (parent1.at(i) + parent2.at(i)) / 2.0;
+//			//check for zero values, if present, remove (TODO: Determine if correct way to handle)
+			if (blendedFreq && sampleFreq.at(i)) {
+				//using base 2 log, so units use are "bits" rather than "nats" (base e)
+				double subDist = sampleFreq.at(i)
+						* log2(sampleFreq.at(i) / blendedFreq);
+//				cerr << blendedFreq << "\t" << sampleFreq[i] << "\t" << subDist << endl;
+				dist += subDist;
+			}
+		}
+		return (dist);
+	}
 };
 
 #endif /* SRC_SEQGROUPCLASSIFIER_HPP_ */

@@ -18,6 +18,7 @@ extern string bf;
 extern string outputPrefix;
 extern string groupingsFile;
 extern string readInput;
+extern double pseudoCount;
 }
 
 

@@ -30,5 +30,6 @@ string bf = "";
 string outputPrefix = "";
 string groupingsFile = "";
 string readInput = "";
+double pseudoCount = 0.001; //for dealing with kl distance zero values
 }
 #endif
