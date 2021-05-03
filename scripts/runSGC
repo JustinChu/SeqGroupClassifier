@@ -1,0 +1,61 @@
+#!/usr/bin/make -Rrf
+ifdef profile
+SHELL=/usr/bin/time -f '=> perpareVaraiantSeqs: %e %C' /bin/bash -o pipefail
+else
+SHELL=/bin/bash -o pipefail
+endif
+
+ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+#------------------------------------------------------------
+# params
+#------------------------------------------------------------
+
+t=1
+k=31
+
+#------------------------------------------------------------
+# meta rules
+#------------------------------------------------------------
+
+.PRECIOUS: $(name)_bg.bf
+.DELETE_ON_ERROR:
+.PHONY: check-params generateplot
+
+default: runPipeline
+
+runPipeline: check-params $(name).mat.tsv $(name).pav.tsv
+
+check-name-param:
+ifndef name
+	$(error missing required param 'name' (output file prefix))
+endif
+
+check-params: check-name-param
+ifndef fa
+	$(error missing required param 'fa' (fasta seqeunce to run analysis on))
+endif
+ifndef backgroundRef
+	$(error missing required param 'backgroundRef' (path to background genome))
+endif
+ifndef backgroundBed
+	$(error missing required param 'backgroundBed' (region in fasta file to omit))
+endif
+
+#------------------------------------------------------------
+# pipeline rules
+#------------------------------------------------------------
+
+#extract and create background sequences
+$(name)_bg.fasta : $(backgroundRef) $(backgroundBed)
+	bedtools maskfasta -fi <(zcat $<) -bed $(backgroundBed) -fo $@
+	
+#extract and create background bf
+$(name)_bg.bf : $(name)_bg.fasta
+	biobloommaker -t $(t) -k $(k) -p $(name)_bg $< 
+
+#run sgc for gene on all samples #TODO fix output filename
+$(name).mat.tsv $(name).pav.tsv: $(fa) $(name)_bg.bf
+	/home/cjustin/git/KmerClassifier/src/seqgc -b $(name)_bg.bf $<
+	
+	
