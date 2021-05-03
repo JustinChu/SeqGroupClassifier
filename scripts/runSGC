@@ -54,6 +54,10 @@ $(name)_bg.fasta : $(backgroundRef) $(backgroundBed)
 $(name)_bg.bf : $(name)_bg.fasta
 	biobloommaker -t $(t) -k $(k) -p $(name)_bg $< 
 
+#run sgc for gene on all samples
+$(name).mat.tsv $(name).pav.tsv: $(fa) $(name)_bg.bf
+	/home/cjustin/git/KmerClassifier/src/seqgc -b $(name)_bg.bf -p $(name) $<
+	
 #run sgc for gene on all samples #TODO fix output filename
 $(name).mat.tsv $(name).pav.tsv: $(fa) $(name)_bg.bf
 	/home/cjustin/git/KmerClassifier/src/seqgc -b $(name)_bg.bf $<
