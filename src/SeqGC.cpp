@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
 		SeqGroupClassifier classifier(counts, builder.getSampleIDs());
 		if(!opt::readInput.empty()){
 			if (Util::fexists(opt::readInput)) {
-				tsl::robin_map<SeqGroupClassifier::GroupID, double> results =
+				tsl::robin_map<SeqGroupClassifier::SampleID, double> results =
 						classifier.computeAllKLDist(opt::readInput);
 				classifier.printResults(results);
 			}
