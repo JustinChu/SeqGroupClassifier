@@ -59,10 +59,12 @@ void printBuildDialog(){
 	"Usage: " PROGRAM " [OPTION]... [FASTA]...\n"
 	"  -p, --prefix           Output name prefix. [required]\n"
 	"  -g, --groups           File outlining groupings.\n"
+	"  -l, --haploid          Run in haploid mode.\n"
 	"  -i, --input            Input sequences to classify.\n"
 	"  -c, --pseudo_count     KL distance value for smoothing.[0.001]\n"
 //	"  -t, --threads          Number of threads to run.[1]\n"
 	"  -b, --bg_bloom         Bloom filter of background sequences. [required]\n"
+	"  -d, --debug            Debug file is produced.\n"
 	"  -h, --help             Display this dialog.\n"
 	"  -v, --verbose          Display verbose output.\n"
 	"      --version          Print version information.\n";
@@ -84,17 +86,19 @@ int main(int argc, char *argv[])
 	static struct option long_options[] = { {
 		"prefix", required_argument, NULL, 'p' }, {
 		"groups", required_argument, NULL, 'g' }, {
+		"haploid", no_argument, NULL, 'l' }, {
 		"input", required_argument, NULL, 'i' }, {
 		"pseudo_count", required_argument, NULL, 'c' }, {
 		"threads", required_argument, NULL, 't' }, {
 		"bg_bloom", required_argument, NULL, 'b' }, {
+		"debug", required_argument, NULL, 'd' }, {
 		"help", no_argument, NULL, 'h' }, {
 		"version", no_argument, &OPT_VERSION, 1 }, {
 		"verbose", no_argument, NULL, 'v' }, {
 		NULL, 0, NULL, 0 } };
 
 	int option_index = 0;
-	while ((c = getopt_long(argc, argv, "p:g:i:c:t:vhb:", long_options,
+	while ((c = getopt_long(argc, argv, "p:g:i:lc:t:vdhb:", long_options,
 			&option_index)) != -1)
 	{
 		istringstream arg(optarg != NULL ? optarg : "");
@@ -126,6 +130,10 @@ int main(int argc, char *argv[])
 			}
 			break;
 		}
+		case 'l': {
+			opt::haploid = true;
+			break;
+		}
 		case 'c': {
 			stringstream convert(optarg);
 			if (!(convert >> opt::pseudoCount)) {
@@ -151,6 +159,10 @@ int main(int argc, char *argv[])
 						<< optarg << endl;
 				return 0;
 			}
+			break;
+		}
+		case 'd': {
+			opt::debug = true;
 			break;
 		}
 		case 'h': {
@@ -219,9 +231,15 @@ int main(int argc, char *argv[])
 		SeqGroupClassifier classifier(counts, builder.getSampleIDs());
 		if(!opt::readInput.empty()){
 			if (Util::fexists(opt::readInput)) {
-				tsl::robin_map<SeqGroupClassifier::SampleID, double> results =
-						classifier.computeAllKLDist(opt::readInput);
-				classifier.printResults(results);
+				if (opt::haploid) {
+//					tsl::robin_map<SeqGroupClassifier::SampleID, double> results =
+//							classifier.computeAllKLDist(opt::readInput);
+//					classifier.printResults(results);
+				} else {
+//					classifier.computeDiploidKLDist(opt::readInput);
+//					classifier.printResults(results);
+					classifier.computeDiploid(opt::readInput);
+				}
 			}
 		}
 	}
