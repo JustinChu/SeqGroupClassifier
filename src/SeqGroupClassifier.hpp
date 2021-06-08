@@ -220,6 +220,46 @@ public:
 				}
 			}
 		}
+		//check for identical alleles
+		if(opt::checkDupes){
+			bool dupFound = false;
+			tsl::robin_set<SampleID> keepSet;
+			for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
+				keepSet.insert(i);
+			}
+			for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
+				for (SampleID j = i + 1; j < m_sampleIDs.size(); ++j) {
+					if (isIdentical(i, j)) {
+						cerr << "Warning: duplicate " << m_sampleIDs[i] << "\t" << m_sampleIDs[j]
+								<< endl;
+						if(keepSet.find(j) != keepSet.end()){
+							keepSet.erase(j);
+						}
+						dupFound = true;
+					}
+				}
+			}
+			if(keepSet.size() != m_sampleIDs.size())
+			{
+				cerr << "Keep:" << endl;
+				for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
+					if (keepSet.find(i) != keepSet.end()) {
+						cerr << m_sampleIDs[i] << endl;
+					}
+				}
+				cerr << "Remove:" << endl;
+				for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
+					if (keepSet.find(i) == keepSet.end()) {
+						cerr << m_sampleIDs[i] << endl;
+					}
+				}
+				if (dupFound) {
+					cerr
+							<< "Warning: Duplicate alleles found. Please remove samples to prevent this Warning."
+							<< endl;
+				}
+			}
+		}
 	}
 
 //	tsl::robin_map<SampleID, double> computeAllKLDist(const string &filename){
@@ -425,6 +465,20 @@ public:
 //			}
 		}
 //		cout << minValue << "\t" << m_sampleIDs[minGroup] << endl;
+	}
+
+	/*
+	 * Print out k-mer count profile of specific sample
+	 */
+	bool isIdentical(SampleID id2, SampleID id1){
+		bool isIdent = true;
+		for (size_t i = 0; i < m_sampleCount.at(id1)->size(); ++i) {
+			if (m_sampleCount.at(id1)->at(i) != m_sampleCount.at(id2)->at(i)) {
+				isIdent = false;
+				break;
+			}
+		}
+		return isIdent;
 	}
 
 	/*

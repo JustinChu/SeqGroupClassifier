@@ -19,6 +19,9 @@ extern string outputPrefix;
 extern string groupingsFile;
 extern string readInput;
 extern double pseudoCount;
+extern bool haploid;
+extern bool debug;
+extern bool checkDupes;
 }
 
 
