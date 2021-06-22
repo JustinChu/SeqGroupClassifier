@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 		"pseudo_count", required_argument, NULL, 'c' }, {
 		"threads", required_argument, NULL, 't' }, {
 		"bg_bloom", required_argument, NULL, 'b' }, {
-		"debug", required_argument, NULL, 'd' }, {
+		"debug", no_argument, NULL, 'd' }, {
 		"help", no_argument, NULL, 'h' }, {
 		"version", no_argument, &OPT_VERSION, 1 }, {
 		"verbose", no_argument, NULL, 'v' }, {
