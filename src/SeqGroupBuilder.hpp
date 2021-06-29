@@ -25,10 +25,10 @@
 #include "vendor/ntHash/ntHashIterator.hpp"
 #include "vendor/tsl/robin_map.h"
 #include "vendor/tsl/robin_set.h"
-#ifndef KSEQ_INIT_NEW
-#define KSEQ_INIT_NEW
 #include <zlib.h>
 #include "vendor/kseq.h"
+#ifndef KSEQ_INIT_NEW
+#define KSEQ_INIT_NEW
 KSEQ_INIT(gzFile, gzread)
 #endif /*KSEQ_INIT_NEW*/
 

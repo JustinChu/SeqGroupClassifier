@@ -20,12 +20,11 @@
 #include "vendor/tsl/robin_map.h"
 #include "vendor/btl_bloomfilter/BloomFilter.hpp"
 #include "vendor/ntHash/ntHashIterator.hpp"
+#include <zlib.h>
 #include "vendor/kseq.h"
 
 #ifndef KSEQ_INIT_NEW
 #define KSEQ_INIT_NEW
-#include <zlib.h>
-#include "vendor/kseq.h"
 KSEQ_INIT(gzFile, gzread)
 #endif /*KSEQ_INIT_NEW*/
 
@@ -52,12 +51,12 @@ public:
 	typedef tsl::robin_map<uint64_t, shared_ptr<vector<opt::Count>>> CountHash; //input vector converted to matrix
 //	typedef tsl::robin_map<pair<SampleID, SampleID>, double, HashPair> ResultsHash;
 
-
-	SeqGroupClassifier(const CountHash &counts, const vector<string> &sampleIDs) :
-			m_sampleIDs(sampleIDs), m_sampleToGroup(vector<GroupID>(m_sampleIDs.size()))  {
+	SeqGroupClassifier(const CountHash &counts, const vector<string> &refIDs) :
+			m_refIDs(refIDs), m_refToGroup(vector<GroupID>(m_refIDs.size())), m_refTotalCounts(
+					m_refIDs.size(), 0) {
 		//create reverse hashtable for sampleIDs
-		for(SampleID i = 0; i < m_sampleIDs.size(); ++i){
-			m_idToSample[m_sampleIDs[i]] = i;
+		for(SampleID i = 0; i < m_refIDs.size(); ++i){
+			m_idToRef[m_refIDs[i]] = i;
 		}
 
 		//parse and load groups file
@@ -85,8 +84,8 @@ public:
 							new vector<SampleID>()));
 					m_groupIDs.push_back(groupName);
 				}
-				m_groupings[m_idToGroup[groupName]]->push_back(m_idToSample[sampleName]);
-				m_sampleToGroup[m_idToSample[sampleName]] = m_idToGroup[groupName];
+				m_groupings[m_idToGroup[groupName]]->push_back(m_idToRef[sampleName]);
+				m_refToGroup[m_idToRef[sampleName]] = m_idToGroup[groupName];
 			}
 			gfh.close();
 		}
@@ -111,7 +110,7 @@ public:
 //			//determine if common to all samples
 //			uint16_t lastCount = i->second->at(0);
 //			bool allSame = true;
-//			for (unsigned j = 1; j < m_sampleIDs.size(); ++j) {
+//			for (unsigned j = 1; j < m_refIDs.size(); ++j) {
 //				if (i->second->at(j) != lastCount) {
 //					allSame = false;
 //					break;
@@ -170,7 +169,6 @@ public:
 	 */
 	void computeSampleFreq(const CountHash &counts) {
 		//figure out counts of each grouping to calculate frequency
-		vector<uint64_t> sampleCount(m_sampleIDs.size(), 0);
 		uint64_t freqMatSize = 0;
 		//for each k-mer
 		for (CountHash::const_iterator i = counts.begin(); i != counts.end();
@@ -178,7 +176,7 @@ public:
 			//determine if common to all samples
 			uint16_t lastCount = i->second->at(0);
 			bool allSame = true;
-			for (unsigned j = 1; j < m_sampleIDs.size(); ++j) {
+			for (unsigned j = 1; j < m_refIDs.size(); ++j) {
 				if (i->second->at(j) != lastCount) {
 					allSame = false;
 					break;
@@ -189,17 +187,17 @@ public:
 				//add to index
 				m_hashToIndex[i->first] = freqMatSize++;
 				//assign count of all k-mers to group
-				for (unsigned j = 0; j < m_sampleIDs.size(); ++j) {
-					sampleCount[j] += i->second->at(j);
+				for (unsigned j = 0; j < m_refIDs.size(); ++j) {
+					m_refTotalCounts[j] += i->second->at(j);
 				}
 			}
 		}
 		//set size of vectors
-		for (unsigned i = 0; i < m_sampleIDs.size(); ++i) {
-			m_sampleFreq.push_back(
-					shared_ptr<vector<double>>(
-							new vector<double>(freqMatSize, 0)));
-			m_sampleCount.push_back(
+		for (unsigned i = 0; i < m_refIDs.size(); ++i) {
+//			m_refFreq.push_back(
+//					shared_ptr<vector<double>>(
+//							new vector<double>(freqMatSize, 0)));
+			m_refCount.push_back(
 					shared_ptr<vector<opt::Count>>(
 							new vector<opt::Count>(freqMatSize, 0)));
 		}
@@ -209,14 +207,8 @@ public:
 				i++) {
 			indexHash::iterator itr = m_hashToIndex.find(i->first);
 			if (itr != m_hashToIndex.end()) {
-				for (unsigned j = 0; j < m_sampleIDs.size(); ++j) {
-
-					double totalCount = double(sampleCount[j])
-							+ double(m_hashToIndex.size()) * opt::pseudoCount;
-					double freq = (double(i->second->at(j)) + opt::pseudoCount)
-							/ totalCount;
-					(*m_sampleCount[j])[itr->second] = i->second->at(j);
-					(*m_sampleFreq[j])[itr->second] = freq;
+				for (unsigned j = 0; j < m_refIDs.size(); ++j) {
+					(*m_refCount[j])[itr->second] = i->second->at(j);
 				}
 			}
 		}
@@ -224,13 +216,13 @@ public:
 		if(opt::checkDupes){
 			bool dupFound = false;
 			tsl::robin_set<SampleID> keepSet;
-			for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
+			for (SampleID i = 0; i < m_refIDs.size(); ++i) {
 				keepSet.insert(i);
 			}
-			for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
-				for (SampleID j = i + 1; j < m_sampleIDs.size(); ++j) {
+			for (SampleID i = 0; i < m_refIDs.size(); ++i) {
+				for (SampleID j = i + 1; j < m_refIDs.size(); ++j) {
 					if (isIdentical(i, j)) {
-						cerr << "Warning: duplicate " << m_sampleIDs[i] << "\t" << m_sampleIDs[j]
+						cerr << "Warning: duplicate " << m_refIDs[i] << "\t" << m_refIDs[j]
 								<< endl;
 						if(keepSet.find(j) != keepSet.end()){
 							keepSet.erase(j);
@@ -239,18 +231,18 @@ public:
 					}
 				}
 			}
-			if(keepSet.size() != m_sampleIDs.size())
+			if(keepSet.size() != m_refIDs.size())
 			{
 				cerr << "Keep:" << endl;
-				for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
+				for (SampleID i = 0; i < m_refIDs.size(); ++i) {
 					if (keepSet.find(i) != keepSet.end()) {
-						cerr << m_sampleIDs[i] << endl;
+						cerr << m_refIDs[i] << endl;
 					}
 				}
 				cerr << "Remove:" << endl;
-				for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
+				for (SampleID i = 0; i < m_refIDs.size(); ++i) {
 					if (keepSet.find(i) == keepSet.end()) {
-						cerr << m_sampleIDs[i] << endl;
+						cerr << m_refIDs[i] << endl;
 					}
 				}
 				if (dupFound) {
@@ -267,8 +259,8 @@ public:
 //		assert(!filename.empty());
 //		vector<double> sampleFreq = loadSeqsToFreq(filename);
 //		//iterate through all combinations
-//		for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
-//			double result = computeKLDist(*m_sampleFreq[i], sampleFreq);
+//		for (SampleID i = 0; i < m_refIDs.size(); ++i) {
+//			double result = computeKLDist(*m_refFreq[i], sampleFreq);
 //			results[i] = result;
 //		}
 //		return results;
@@ -284,23 +276,23 @@ public:
 //		double minValue = numeric_limits<double>::max();
 //		vector<double> sampleFreq = loadSeqsToFreq(filename).first;
 //		//iterate through all combinations
-//		for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
-//			for (SampleID j = i; j < m_sampleIDs.size(); ++j) {
-//				double result = computeKLDist(*m_sampleFreq[i],
-//						*m_sampleFreq[j], sampleFreq);
+//		for (SampleID i = 0; i < m_refIDs.size(); ++i) {
+//			for (SampleID j = i; j < m_refIDs.size(); ++j) {
+//				double result = computeKLDist(*m_refFreq[i],
+//						*m_refFreq[j], sampleFreq);
 //				if (result < minValue) {
 //					minValue = result;
 //					minGroups = pair<SampleID, SampleID> (i, j);
 //				}
-////				cout << result << "\t" << m_sampleIDs[i] << "\t"
-////						<< m_sampleIDs[j] << "\t" << m_groupIDs[m_sampleToGroup[i]] << "\t"
-////						<< m_groupIDs[m_sampleToGroup[j]] << endl;
+////				cout << result << "\t" << m_refIDs[i] << "\t"
+////						<< m_refIDs[j] << "\t" << m_groupIDs[m_refToGroup[i]] << "\t"
+////						<< m_groupIDs[m_refToGroup[j]] << endl;
 //			}
 //		}
-//		cout << minValue << "\t" << m_sampleIDs[minGroups.first] << "\t"
-//				<< m_sampleIDs[minGroups.second] << "\t"
-//				<< m_groupIDs[m_sampleToGroup[minGroups.first]] << "\t"
-//				<< m_groupIDs[m_sampleToGroup[minGroups.second]] << endl;
+//		cout << minValue << "\t" << m_refIDs[minGroups.first] << "\t"
+//				<< m_refIDs[minGroups.second] << "\t"
+//				<< m_groupIDs[m_refToGroup[minGroups.first]] << "\t"
+//				<< m_groupIDs[m_refToGroup[minGroups.second]] << endl;
 //	}
 
 	/*
@@ -309,14 +301,19 @@ public:
 	void computeDiploid(const string &filename) {
 		assert(Util::fexists(filename));
 		vector<opt::Count> sampleCount = loadSeqsToCount(filename);
-		vector<double> mleValues(m_sampleIDs.size()*((m_sampleIDs.size()+1))/2);
+		vector<double> mleValues(m_refIDs.size()*((m_refIDs.size()+1))/2);
 		size_t matIndex = 0;
 		double maxLogValue = -1.0 * numeric_limits<double>::max();
 
-		for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
-			for (SampleID j = i; j < m_sampleIDs.size(); ++j) {
-				double logMLE = computeLogMLE(*m_sampleFreq[i],
-						*m_sampleFreq[j], sampleCount);
+		size_t sampleCountTotal = 0;
+
+		for (size_t i = 0; i < sampleCount.size(); ++i) {
+			sampleCountTotal += sampleCount.at(i);
+		}
+
+		for (SampleID i = 0; i < m_refIDs.size(); ++i) {
+			for (SampleID j = i; j < m_refIDs.size(); ++j) {
+				double logMLE = computeLogMLE(i,j, sampleCount);
 				mleValues[matIndex++] = logMLE;
 				if(maxLogValue < logMLE){
 					maxLogValue = logMLE;
@@ -338,20 +335,20 @@ public:
 //		double bayesSum = 0;
 
 		//iterate through all combinations
-		for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
-			for (SampleID j = i; j < m_sampleIDs.size(); ++j) {
-				double klDist = computeKLDist(*m_sampleFreq[i],
-						*m_sampleFreq[j], sampleCount);
+		for (SampleID i = 0; i < m_refIDs.size(); ++i) {
+			for (SampleID j = i; j < m_refIDs.size(); ++j) {
+				double klDist = computeKLDist(i, j, sampleCount,
+						sampleCountTotal);
 
 				double logMLE = mleValues[matIndex++];
 				double mle = pow(2, logMLE - maxLogValue);
 				double bayesProb = computeBayesianProb(
-						1.0 / double(m_sampleIDs.size()),
-						1.0 / double(m_sampleIDs.size()), mle, bayesDeom);
+						1.0 / double(m_refIDs.size()),
+						1.0 / double(m_refIDs.size()), mle, bayesDeom);
 //				bayesSum += bayesProb;
-//				cout << m_sampleIDs[i] << "\t" << m_sampleIDs[j] << "\t"
-//						<< m_groupIDs[m_sampleToGroup[i]] << "\t"
-//						<< m_groupIDs[m_sampleToGroup[j]] << "\t" << klDist
+//				cout << m_refIDs[i] << "\t" << m_refIDs[j] << "\t"
+//						<< m_groupIDs[m_refToGroup[i]] << "\t"
+//						<< m_groupIDs[m_refToGroup[j]] << "\t" << klDist
 //						<< "\t" << minValueKL << "\t" << logMLE << "\t"
 //						<< maxLogMLE << "\t" << bayesProb << "\t"
 //						<< maxBayesProb << "\t" << mle << "\t" << bayesSum <<  endl;
@@ -369,9 +366,9 @@ public:
 				}
 
 				if(bayesProb > 0.0) {
-					cout << m_sampleIDs[i] << "\t" << m_sampleIDs[j] << "\t"
-							<< m_groupIDs[m_sampleToGroup[i]] << "\t"
-							<< m_groupIDs[m_sampleToGroup[j]] << "\t" << klDist
+					cout << m_refIDs[i] << "\t" << m_refIDs[j] << "\t"
+							<< m_groupIDs[m_refToGroup[i]] << "\t"
+							<< m_groupIDs[m_refToGroup[j]] << "\t" << klDist
 							<< "\t" <<  logMLE << "\t" << bayesProb <<  endl;
 				}
 			}
@@ -382,38 +379,42 @@ public:
 			std::ofstream countFH (opt::outputPrefix + ".debug.counts.tsv", std::ofstream::out);
 			std::ofstream infoFH (opt::outputPrefix + ".debug.tsv", std::ofstream::out);
 
-			countFH << "sample" << "\t";
+			countFH << opt::outputPrefix << "sample";
 			for (vector<opt::Count>::const_iterator itr =
 					sampleCount.begin(); itr != sampleCount.end();
 					itr++) {
-				countFH << *itr << "\t";
+				countFH << "\t" << *itr;
 			}
+			countFH << endl;
+
 
 			matIndex = 0;
-			for (SampleID i = 0; i < m_sampleIDs.size(); ++i) {
-				for (SampleID j = i; j < m_sampleIDs.size(); ++j) {
-					double klDist = computeKLDist(*m_sampleFreq[i],
-							*m_sampleFreq[j], sampleCount);
+			for (SampleID i = 0; i < m_refIDs.size(); ++i) {
+				countFH << m_refIDs[i];
+				printDebug(i, countFH);
+				for (SampleID j = i; j < m_refIDs.size(); ++j) {
+//					if (opt::outputPrefix == m_refIDs[i] + "_" + m_refIDs[j]) {
+//						computeKLDistDebug(i, j, sampleCount, sampleCountTotal);
+//					}
+
+					double klDist = computeKLDist(i, j, sampleCount, sampleCountTotal);
 
 					double logMLE = mleValues[matIndex++];
 					double mle = pow(2, logMLE - maxLogValue);
 					double bayesProb = computeBayesianProb(
-							1.0 / double(m_sampleIDs.size()),
-							1.0 / double(m_sampleIDs.size()), mle, bayesDeom);
+							1.0 / double(m_refIDs.size()),
+							1.0 / double(m_refIDs.size()), mle, bayesDeom);
 
-					if (bayesProb == maxBayesProb) {
-						infoFH << m_sampleIDs[i] << "_" << m_sampleIDs[j]
-								<< "\t" << m_sampleIDs[i] << "\t"
-								<< m_sampleIDs[j] << "\t"
-								<< m_groupIDs[m_sampleToGroup[i]] << "\t"
-								<< m_groupIDs[m_sampleToGroup[j]] << "\t"
+					if (bayesProb > 0) {
+						infoFH << m_refIDs[i] << "_" << m_refIDs[j]
+								<< "\t" << m_refIDs[i] << "\t"
+								<< m_refIDs[j] << "\t"
+								<< m_groupIDs[m_refToGroup[i]] << "\t"
+								<< m_groupIDs[m_refToGroup[j]] << "\t"
 								<< klDist << "\t" << logMLE << "\t" << bayesProb
 								<< endl;
-						countFH << m_sampleIDs[i] << "\t";
-						printDebug(i, countFH);
-						countFH << m_sampleIDs[j] << "\t";
-						printDebug(j, countFH);
-						countFH << m_sampleIDs[i] << "_" << m_sampleIDs[j] << "\t";
+//						cerr << m_refCount.at(i)->size() << endl;
+						countFH << m_refIDs[i] << "_" << m_refIDs[j];
 						printDebugBlend(i, j, countFH);
 					}
 				}
@@ -442,8 +443,8 @@ public:
 ////		double minValue = numeric_limits<double>::max();
 //		for (SeqGroupClassifier::ResultsHash::iterator itr = results.begin();
 //				itr != results.end(); ++itr) {
-//			cout << itr->second << "\t" << m_sampleIDs[itr->first.first] << "\t"
-//					<< m_sampleIDs[itr->first.second] << endl;
+//			cout << itr->second << "\t" << m_refIDs[itr->first.first] << "\t"
+//					<< m_refIDs[itr->first.second] << endl;
 ////			if(itr->second < minValue){
 ////				minValue = itr->second;
 ////				minGroups = itr->first;
@@ -458,13 +459,13 @@ public:
 //		double minValue = numeric_limits<double>::max();
 		for (tsl::robin_map<SeqGroupClassifier::GroupID, double>::iterator itr =
 				results.begin(); itr != results.end(); ++itr) {
-			cout << itr->second << "\t" << m_sampleIDs[itr->first] << endl;
+			cout << itr->second << "\t" << m_refIDs[itr->first] << endl;
 //			if(itr->second < minValue){
 //				minValue = itr->second;
 //				minGroup = itr->first;
 //			}
 		}
-//		cout << minValue << "\t" << m_sampleIDs[minGroup] << endl;
+//		cout << minValue << "\t" << m_refIDs[minGroup] << endl;
 	}
 
 	/*
@@ -472,8 +473,8 @@ public:
 	 */
 	bool isIdentical(SampleID id2, SampleID id1){
 		bool isIdent = true;
-		for (size_t i = 0; i < m_sampleCount.at(id1)->size(); ++i) {
-			if (m_sampleCount.at(id1)->at(i) != m_sampleCount.at(id2)->at(i)) {
+		for (size_t i = 0; i < m_refCount.at(id1)->size(); ++i) {
+			if (m_refCount.at(id1)->at(i) != m_refCount.at(id2)->at(i)) {
 				isIdent = false;
 				break;
 			}
@@ -485,8 +486,8 @@ public:
 	 * Print out k-mer count profile of specific sample
 	 */
 	void printDebug(SampleID id, ofstream &debugStream) {
-		for (size_t i = 0; i < m_sampleCount.at(id)->size(); ++i) {
-			debugStream << m_sampleCount.at(id)->at(i) << "\t";
+		for (size_t i = 0; i < m_refCount.at(id)->size(); ++i) {
+			debugStream << "\t" << m_refCount.at(id)->at(i) ;
 		}
 		debugStream << endl;
 	}
@@ -495,10 +496,10 @@ public:
 	 * Print out k-mer count profile of specific sample
 	 */
 	void printDebugBlend(SampleID id1, SampleID id2, ofstream &debugStream) {
-		for (size_t i = 0; i < m_sampleCount.at(id1)->size(); ++i) {
-			debugStream
-					<< m_sampleCount.at(id1)->at(i)
-							+ m_sampleCount.at(id2)->at(i) << "\t";
+		for (size_t i = 0; i < m_refCount.at(id1)->size(); ++i) {
+			debugStream << "\t"
+					<< m_refCount.at(id1)->at(i)
+							+ m_refCount.at(id2)->at(i);
 		}
 		debugStream << endl;
 	}
@@ -511,17 +512,18 @@ public:
 	 }
 
 private:
-	const vector<string> &m_sampleIDs;
+	const vector<string> &m_refIDs;
 	vector<string> m_groupIDs;
-	tsl::robin_map<string, SampleID> m_idToSample;
+	tsl::robin_map<string, SampleID> m_idToRef;
 	tsl::robin_map<string, GroupID> m_idToGroup;
 	vector<shared_ptr<vector<SampleID>>> m_groupings;
-	vector<GroupID> m_sampleToGroup;
-//	tsl::robin_map<SampleID, GroupID> &m_sampleToGroup;
+	vector<GroupID> m_refToGroup;
+//	tsl::robin_map<SampleID, GroupID> &m_refToGroup;
 	indexHash m_hashToIndex; //hashed k-mer value to index
 //	vector<shared_ptr<vector<double>>> m_groupFreq;
-	vector<shared_ptr<vector<double>>> m_sampleFreq;
-	vector<shared_ptr<vector<opt::Count>>> m_sampleCount; //for debug purposes
+//	vector<shared_ptr<vector<double>>> m_refFreq;
+	vector<shared_ptr<vector<opt::Count>>> m_refCount;
+	vector<size_t> m_refTotalCounts; //for debug purposes
 
 //	/*
 //	 * TODO: possible pitfall - currently k-mers are stored as hashvalues rather
@@ -620,8 +622,6 @@ private:
 		return(counts);
 	}
 
-
-
 	double computeKLDist(const vector<double> &parent, const vector<double> &sampleFreq) const{
 		double dist = 0.0;
 		for (size_t i = 0; i < sampleFreq.size(); ++i) {
@@ -639,13 +639,16 @@ private:
 	/*
 	 * Assuming diploid genome compute KL distances metric
 	 */
-	double computeKLDist(const vector<double> &parent1,
-			const vector<double> &parent2,
-			const vector<opt::Count> &sampleCount) const {
+	double computeKLDist(SampleID parent1, SampleID parent2,
+			const vector<opt::Count> &sampleCount, size_t countTotal) const {
 		double dist = 0.0;
+		double adjCountTotal = double(countTotal) + double(sampleCount.size()) * opt::pseudoCount;
+		double refCountTotal = computeRefTotal(parent1, parent2);
 		for (size_t i = 0; i < sampleCount.size(); ++i) {
-			double blendedFreq = (parent1.at(i) + parent2.at(i)) / 2.0;
-			double sampleFreq = double(sampleCount.at(i)) / double(sampleCount.size());
+			double blendedFreq = (double(m_refCount.at(parent1)->at(i))
+					+ double(m_refCount.at(parent2)->at(i)) + opt::pseudoCount)
+					/ refCountTotal;
+			double sampleFreq = double(sampleCount.at(i)) / adjCountTotal;
 			if(sampleFreq != 0){
 				double subDist = sampleFreq	* log2(sampleFreq / blendedFreq);
 				dist += subDist;
@@ -654,12 +657,61 @@ private:
 		return (dist);
 	}
 
-	double computeLogMLE(const vector<double> &parent1,
-			const vector<double> &parent2,
-			const vector<opt::Count> &sampleCount) const{
+//	double computeKLDistDebug(SampleID ref1, SampleID ref2,
+//			const vector<opt::Count> &sampleCount, size_t countTotal) const {
+//		double dist = 0.0;
+//		double adjCountTotal = double(countTotal) + double(sampleCount.size()) * opt::pseudoCount;
+//		double adjCountTotal2 = double(
+//				m_refTotalCounts.at(ref1) + m_refTotalCounts.at(ref2))
+//				+ double(sampleCount.size()) * opt::pseudoCount;
+//		for (size_t i = 0; i < sampleCount.size(); ++i) {
+//			double blendedFreq = (m_refFreq.at(ref1)->at(i)
+//					+ m_refFreq.at(ref2)->at(i)) / 2.0;
+//			double blendedFreq2 = (double(
+//					m_refCount.at(ref1)->at(i) + m_refCount.at(ref2)->at(i))
+//					+ opt::pseudoCount) / adjCountTotal2;
+//			double blendedFreqA = (double(m_refCount.at(ref1)->at(i))
+//					+ opt::pseudoCount)
+//					/ (double(m_refTotalCounts.at(ref1))
+//							+ double(sampleCount.size()) * opt::pseudoCount);
+//			double blendedFreqB = (double(m_refCount.at(ref2)->at(i))
+//					+ opt::pseudoCount)
+//					/ (double(m_refTotalCounts.at(ref2))
+//							+ double(sampleCount.size()) * opt::pseudoCount);
+//			double sampleFreq = (double(sampleCount.at(i)) + opt::pseudoCount)
+//					/ adjCountTotal;
+//
+//			cout << blendedFreq << "\t" << sampleFreq << "\t" << blendedFreq2
+//					<< "\t" << blendedFreqA << "\t" << blendedFreqB << "\t"
+//					<< m_refFreq.at(ref1)->at(i) << "\t"
+//					<< m_refFreq.at(ref2)->at(i) << "\t" << sampleCount.at(i)
+//					<< "\t" << m_refCount.at(ref1)->at(i) << "\t"
+//					<< m_refCount.at(ref2)->at(i) << "\t" << countTotal
+//					<< "\t" << m_refTotalCounts.at(ref1) << "\t"
+//					<< m_refTotalCounts.at(ref2) << endl;
+//			if (sampleFreq != 0) {
+//				double subDist = sampleFreq	* log2(sampleFreq / blendedFreq);
+//				dist += subDist;
+//			}
+//		}
+//		return (dist);
+//	}
+
+	double computeRefTotal(SampleID parent1, SampleID parent2) const{
+		double refCountTotal = double(
+				m_refTotalCounts.at(parent1) + m_refTotalCounts.at(parent2))
+				+ double(m_refCount.at(parent1)->size()) * opt::pseudoCount;
+		return refCountTotal;
+	}
+
+	double computeLogMLE(SampleID parent1, SampleID parent2,
+			const vector<opt::Count> &sampleCount) const {
 		double logProb = 0;
+		double refCountTotal = computeRefTotal(parent1, parent2);
 		for (size_t i = 0; i < sampleCount.size(); ++i) {
-			double blendedFreq = (parent1[i] + parent2[i]) / 2.0;
+			double blendedFreq = (double(m_refCount.at(parent1)->at(i))
+					+ double(m_refCount.at(parent2)->at(i)) + opt::pseudoCount)
+					/ refCountTotal;
 			logProb += log2(blendedFreq) * double(sampleCount[i]);
 		}
 		return(logProb);
@@ -674,19 +726,13 @@ private:
 		//iterate through all combinations
 		for (size_t matIndex = 0; matIndex < mleValues.size(); ++matIndex) {
 			double logMLE = mleValues[matIndex];
-			double freqGroup1 = 1.0 / double(m_sampleIDs.size());
-			double freqGroup2 = 1.0 / double(m_sampleIDs.size());
+			double freqGroup1 = 1.0 / double(m_refIDs.size());
+			double freqGroup2 = 1.0 / double(m_refIDs.size());
 			double prob = pow(2, logMLE - scaling) * freqGroup1 * freqGroup2;
 			probAll += prob;
 		}
 		return (probAll);
 	}
-
-//	double computeBayesianProb(double freqGroup, double mle,
-//			double probAll) const {
-//		double prob = (mle * freqGroup) / probAll;
-//		return (prob);
-//	}
 
 	double computeBayesianProb(double freqGroup1, double freqGroup2,
 			double mle, double probAll) const {
