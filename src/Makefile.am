@@ -9,6 +9,8 @@ seqgc_CPPFLAGS = -I$(top_srcdir)/src \
 seqgc_LDFLAGS = $(OPENMP_CXXFLAGS) \
 	-lz \
 	-pthread
+	
+seqgc_LDADD = -lz
 
 seqgc_SOURCES = SeqGC.cpp \
 	SeqGroupBuilder.hpp \

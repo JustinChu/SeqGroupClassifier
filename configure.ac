@@ -29,9 +29,9 @@ AC_SUBST(AM_CXXFLAGS, "-Wall -Wextra -Werror $AM_CXXFLAGS")
 # Find the absolute paths.
 srcdir=$(cd $srcdir; pwd)
 
-
 # Checks for header files.
 AC_LANG([C++])	#sets the auto conf to look for c++ headers
+AC_CHECK_HEADERS([zlib.h])
 
 # Check for OpenMP.
 AC_OPENMP
