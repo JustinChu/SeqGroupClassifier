@@ -56,5 +56,5 @@ $(name)_bg.bf : $(name)_bg.fasta
 
 #run sgc for gene on all samples
 $(name).mat.tsv $(name).pav.tsv: $(fa) $(name)_bg.bf
-	/home/cjustin/git/KmerClassifier/src/seqgc -b $(name)_bg.bf -p $(name) $<
+	seqgc -b $(name)_bg.bf -p $(name) $<
 
