@@ -224,23 +224,25 @@ int main(int argc, char *argv[])
 	SeqGroupBuilder builder(inputFiles);
 	SeqGroupBuilder::CountsHash counts = builder.loadFiles();
 
-	if(opt::groupingsFile.empty()){
-		builder.printMatrixes(counts);
-	}
-	else{
-		SeqGroupClassifier classifier(counts, builder.getSampleIDs());
-		if(!opt::readInput.empty()){
-			if (Util::fexists(opt::readInput)) {
-				if (opt::haploid) {
-//					tsl::robin_map<SeqGroupClassifier::SampleID, double> results =
-//							classifier.computeAllKLDist(opt::readInput);
-//					classifier.printResults(results);
-				} else {
-//					classifier.computeDiploidKLDist(opt::readInput);
-//					classifier.printResults(results);
-					classifier.computeDiploid(opt::readInput);
-				}
-			}
+	if(!opt::readInput.empty()){
+		assert(Util::fexists(opt::readInput));
+		if (opt::groupingsFile.empty()) {
+			SeqGroupClassifier classifier(counts, builder.getSampleIDs());
+			classifier.computeDiploid(opt::readInput);
+//			builder.printMatrixes(counts);
+//		} else {
+//			SeqGroupClassifier classifier(counts, builder.getSampleIDs());
+//			if (!opt::readInput.empty()) {
+//				if (opt::haploid) {
+////					tsl::robin_map<SeqGroupClassifier::SampleID, double> results =
+////							classifier.computeAllKLDist(opt::readInput);
+////					classifier.printResults(results);
+//				} else {
+////					classifier.computeDiploidKLDist(opt::readInput);
+////					classifier.printResults(results);
+//					classifier.computeDiploid(opt::readInput);
+//				}
+//			}
 		}
 	}
 

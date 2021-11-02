@@ -33,6 +33,6 @@ string readInput = "";
 double pseudoCount = 0.001; //for dealing with kl distance zero values
 bool haploid = false;
 bool debug = false;
-bool checkDupes = true;
+//bool checkDupes = true;
 }
 #endif
