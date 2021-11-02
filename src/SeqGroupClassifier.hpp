@@ -628,24 +628,28 @@ private:
 		} else if (opt::verbose) {
 			std::cerr << "Opening " << filename << std::endl;
 		}
+
 		kseq_t *seq = kseq_init(fp);
-		int l = kseq_read(seq);
-		unsigned index = 0;
-		while (l >= 0) {
-			//k-merize
-			for (ntHashIterator itr(seq->seq.s, opt::hashNum, opt::k);
-					itr != itr.end(); ++itr) {
-				//remove background k-mers (optional)
-				//if kmer exists inside bg set
-				if (!bf.contains(*itr)) {
-					indexHash::iterator seqIndex = m_hashToIndex.find((*itr)[0]);
-					if(seqIndex != m_hashToIndex.end()){
-						++counts[seqIndex->second];
+#pragma omp parallel
+		for (int l;;) {
+#pragma omp critical(kseq_read)
+			{
+				l = kseq_read(seq);
+			}
+			if (l >= 0) {
+				for (ntHashIterator itr(seq->seq.s, opt::hashNum, opt::k);
+						itr != itr.end(); ++itr) {
+					//if kmer exists inside bg set
+					if (!bf.contains(*itr)) {
+						indexHash::iterator seqIndex = m_hashToIndex.find((*itr)[0]);
+						if(seqIndex != m_hashToIndex.end()){
+#pragma omp atomic
+							++counts[seqIndex->second];
+						}
 					}
 				}
-			}
-			l = kseq_read(seq);
-			index++;
+			} else
+				break;
 		}
 		kseq_destroy(seq);
 		gzclose(fp);
