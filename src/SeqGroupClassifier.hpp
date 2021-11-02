@@ -189,12 +189,12 @@ public:
 
 		for (SampleID i = 0; i < m_refIDs.size(); ++i) {
 			for (SampleID j = i + 1; j < m_refIDs.size(); ++j) {
-
-				if (isIdentical(counts, i, j)) {
-					cerr << "Collapsing duplicate: " << m_refIDs[i] << "\t" << m_refIDs[j]
-							<< endl;
-					keepSet[i] += "," + m_refIDs.at(j);
-					if(keepSet.find(j) != keepSet.end()){
+				if (keepSet.find(i) != keepSet.end()
+						&& keepSet.find(j) != keepSet.end()) {
+					if (isIdentical(counts, i, j)) {
+						cerr << "Collapsing duplicate: " << m_refIDs[i] << "\t"
+								<< m_refIDs[j] << endl;
+						keepSet[i] += "," + m_refIDs.at(j);
 						keepSet.erase(j);
 					}
 				}
@@ -396,9 +396,6 @@ public:
 				}
 			}
 		}
-
-		std::ofstream countFH (opt::outputPrefix + ".debug.counts.tsv", std::ofstream::out);
-		countFH << opt::outputPrefix << "sample";
 
 		if(opt::debug){
 			//debugfilehandle
