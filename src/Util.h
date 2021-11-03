@@ -11,6 +11,7 @@
 #define SRC_UTIL_H_
 #include <string>
 #include <fstream>
+#include <cstring>
 
 using namespace std;
 
@@ -30,6 +31,28 @@ static bool fexists(const string &filename) {
  */
 static unsigned matToIndex(unsigned i, unsigned j, unsigned n) {
 	return ((n * (n - 1) / 2) - (n - i) * ((n - i) - 1) / 2 + j - i - 1);
+}
+
+/*
+ * Get resident set size of memory
+ */
+static size_t getRSS(){ //Note: this value is in KB!
+    FILE* file = fopen("/proc/self/status", "r");
+    int result = -1;
+    char line[128];
+
+    while (fgets(line, 128, file) != NULL){
+        if (strncmp(line, "VmRSS:", 6) == 0){
+            int i = strlen(line);
+            const char* p = line;
+            while (*p <'0' || *p > '9') p++;
+            line[i-3] = '\0';
+            result = atoi(p);
+            break;
+        }
+    }
+    fclose(file);
+    return result;
 }
 
 ///*

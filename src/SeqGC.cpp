@@ -220,6 +220,8 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	double time = omp_get_wtime();
+
 	//load sequence
 	SeqGroupBuilder builder(inputFiles);
 	SeqGroupBuilder::CountsHash counts = builder.loadFiles();
@@ -245,6 +247,9 @@ int main(int argc, char *argv[])
 //			}
 		}
 	}
+
+	cerr << "Time: " << omp_get_wtime() - time << "s\nMemory:" << Util::getRSS()
+			<< "kbytes" << endl;
 
 	return 0;
 }
