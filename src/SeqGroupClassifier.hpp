@@ -104,8 +104,6 @@ public:
 //			m_idToRef[m_refIDs[i]] = i;
 //		}
 		computeSampleFreq(counts);
-
-		m_refTotalCounts = vector<size_t>(m_collapsedIDs.size(), 0);
 	}
 
 //	/*
@@ -174,7 +172,7 @@ public:
 //			}
 //		}
 //	}
-//
+
 	/*
 	 * Compute frequency matrix for each of group ID
 	 * Creates a hash value (derived from k-mer) to matrix
@@ -212,7 +210,7 @@ public:
 		for (unsigned i = 0; i < m_refIDs.size(); ++i) {
 			if (keepSet.find(i) != keepSet.end()) {
 				m_refToCollapsedID[i] = m_collapsedIDs.size();
-				m_refTotalCounts.push_back(0);
+				m_collapsedTotalCounts.push_back(0);
 				m_collapsedIDs.push_back(keepSet.at(i));
 			}
 		}
@@ -236,16 +234,17 @@ public:
 				//if not common to all samples count total number to group and increment size
 				//add to index
 				//assign count of all k-mers to group
-				for (tsl::robin_map<SampleID, string>::iterator j =
-						keepSet.begin(); j != keepSet.end(); ++j) {
-					m_refTotalCounts[m_refToCollapsedID[j->first]] +=
-							i->second->at(j->first);
+				for (unsigned j = 0; j < m_refIDs.size(); ++j) {
+					if (keepSet.find(j) != keepSet.end()) {
+						m_collapsedTotalCounts[m_refToCollapsedID[j]] +=
+								i->second->at(j);
+					}
 				}
 			}
 		}
 
-		for (tsl::robin_map<SampleID, SampleID>::iterator itr =
-				m_refToCollapsedID.begin(); itr != m_refToCollapsedID.end(); ++itr) {
+		for (vector<string>::iterator itr =
+				m_collapsedIDs.begin(); itr != m_collapsedIDs.end(); ++itr) {
 			m_kmerCounts.push_back(
 					shared_ptr<vector<opt::Count>>(
 							new vector<opt::Count>(freqMatSize, 0)));
@@ -256,12 +255,74 @@ public:
 				i++) {
 			indexHash::iterator itr = m_hashToIndex.find(i->first);
 			if (itr != m_hashToIndex.end()) {
-				for (unsigned j = 0; j < m_kmerCounts.size(); ++j) {
-					(*m_kmerCounts[j])[itr->second] = i->second->at(j);
+				for (unsigned j = 0; j < m_refIDs.size(); ++j) {
+					if (keepSet.find(j) != keepSet.end()) {
+						(*m_kmerCounts[m_refToCollapsedID[j]])[itr->second] =
+								i->second->at(j);
+					}
 				}
 			}
 		}
 	}
+
+//	/*
+//	 * Compute frequency matrix for each of group ID
+//	 * Creates a hash value (derived from k-mer) to matrix
+//	 */
+//	void computeSampleFreq(const CountHash &counts) {
+//		//figure out counts of each grouping to calculate frequency
+//		uint64_t freqMatSize = 0;
+//		//for each k-mer
+//
+//		m_collapsedTotalCounts = vector<size_t>(m_refIDs.size());
+//
+//		for (CountHash::const_iterator i = counts.begin(); i != counts.end();
+//				i++) {
+//			//determine if common to all samples
+//			uint16_t lastCount = i->second->at(0);
+//			bool allSame = true;
+//			for (unsigned j = 1; j < m_refIDs.size(); ++j) {
+//				if (i->second->at(j) != lastCount) {
+//					allSame = false;
+//					break;
+//				}
+//			}
+//			if (!allSame) {
+//				//if not common to all samples count total number to group and increment size
+//				//add to index
+//				m_hashToIndex[i->first] = freqMatSize++;
+//				//assign count of all k-mers to group
+//				for (unsigned j = 0; j < m_refIDs.size(); ++j) {
+//					m_collapsedTotalCounts[j] += i->second->at(j);
+//				}
+//			}
+//		}
+//
+//		for (unsigned j = 0; j < m_refIDs.size(); ++j) {
+//			m_collapsedIDs.push_back(m_refIDs[j]);
+//		}
+//
+//		//set size of vectors
+//		for (unsigned i = 0; i < m_refIDs.size(); ++i) {
+////			m_refFreq.push_back(
+////					shared_ptr<vector<double>>(
+////							new vector<double>(freqMatSize, 0)));
+//			m_kmerCounts.push_back(
+//					shared_ptr<vector<opt::Count>>(
+//							new vector<opt::Count>(freqMatSize, 0)));
+//		}
+//
+//		//populate matrix
+//		for (CountHash::const_iterator i = counts.begin(); i != counts.end();
+//				i++) {
+//			indexHash::iterator itr = m_hashToIndex.find(i->first);
+//			if (itr != m_hashToIndex.end()) {
+//				for (unsigned j = 0; j < m_refIDs.size(); ++j) {
+//					(*m_kmerCounts[j])[itr->second] = i->second->at(j);
+//				}
+//			}
+//		}
+//	}
 
 //	tsl::robin_map<SampleID, double> computeAllKLDist(const string &filename){
 //		tsl::robin_map<SampleID, double> results;
@@ -540,6 +601,7 @@ private:
 	const vector<string> &m_refIDs;
 	vector<string> m_collapsedIDs;
 	tsl::robin_map<SampleID, SampleID> m_refToCollapsedID;
+	vector<size_t> m_collapsedTotalCounts;
 //	vector<string> m_groupIDs;
 //	tsl::robin_map<string, SampleID> m_idToRef;
 //	tsl::robin_map<string, GroupID> m_idToGroup;
@@ -550,7 +612,7 @@ private:
 //	vector<shared_ptr<vector<double>>> m_groupFreq;
 //	vector<shared_ptr<vector<double>>> m_refFreq;
 	vector<shared_ptr<vector<opt::Count>>> m_kmerCounts;
-	vector<size_t> m_refTotalCounts;
+//	vector<size_t> m_refTotalCounts;
 
 //	/*
 //	 * TODO: possible pitfall - currently k-mers are stored as hashvalues rather
@@ -730,7 +792,7 @@ private:
 
 	double computeRefTotal(SampleID parent1, SampleID parent2) const{
 		double refCountTotal = double(
-				m_refTotalCounts.at(parent1) + m_refTotalCounts.at(parent2))
+				m_collapsedTotalCounts.at(parent1) + m_collapsedTotalCounts.at(parent2))
 				+ double(m_kmerCounts.at(parent1)->size()) * opt::pseudoCount;
 		return refCountTotal;
 	}
