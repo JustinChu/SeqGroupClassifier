@@ -11,6 +11,8 @@ ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 # params
 #------------------------------------------------------------
 
+maxDist = 10000
+
 #------------------------------------------------------------
 # meta rules
 #------------------------------------------------------------
@@ -59,8 +61,12 @@ endif
 $(name)_ref.bed: $(gtfBed)
 	zcat $< | grep -E '\|$(geneName)\s' > $@
 	
+#if on same chromosome bridge locations
+$(name)_ref_bridged.bed: $(name)_ref.bed
+	bedtools merge -d $(maxDist) -i $< > $@
+	
 #use bed file to find bubbles
-$(name)_bubble.bed: $(name)_ref.bed
+$(name)_bubble.bed: $(name)_ref_bridged.bed
 	tabix $(bubbleBed) -R $< | awk '{print $$1"\t"$$2"\t"$$3}' | sort | uniq > $@
 
 #extract regions from each haplotype path bed
