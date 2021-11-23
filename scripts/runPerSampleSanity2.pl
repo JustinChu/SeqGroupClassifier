@@ -5,29 +5,23 @@ use strict;
 use diagnostics;
 use IO::File;
 
-my $groupingsFile = $ARGV[0];
-my $fastaInput    = $ARGV[1];
-my $backgroundBF  = $ARGV[2];
-my $fh            = new IO::File( $groupingsFile, "r" );
+my $fastaInput    = $ARGV[0];
+my $backgroundBF  = $ARGV[1];
+my $fh            = new IO::File( $fastaInput, "r" );
 
 my $line = $fh->getline();
 
-my %sampleToGroup;
 my @sampleIDs;
 
-#extract sampleID->groupID
+#extract sampleID
 while ($line) {
 	chomp($line);
 	my @tempArr    = split( /\t/, $line );
-	my $sampleName = $tempArr[0];
-
-#GRCh38#0#chr6:31984662-32023790	117.912063381843	-11.4816618982337	14035.0832509091	1
-	my $groupID = $tempArr[4];
-
-	#extract sampleID->groupID
-	$sampleToGroup{$sampleName} = $groupID;
+	if($line =~ />([^\n]+)/){
+	my $sampleName = $1;
 	push( @sampleIDs, $sampleName );
 	$line = $fh->getline();
+	}
 }
 $fh->close();
 for ( my $i = 0 ; $i < scalar(@sampleIDs) ; ++$i ) {
@@ -54,8 +48,7 @@ for ( my $i = 0 ; $i < scalar(@sampleIDs) ; ++$i ) {
 #/home/cjustin/git/KmerClassifier/src/seqgc -p test -g ../../../C4.grouping.tsv -b ../C4_sgc_bg.bf -i C4_HG00735.2_reads.bfast.fastq.gz -c 0.001 ../C4_fixed.fa
 		my $seqgcCMD =
 			'seqgc --debug -p '
-		  . $tempOutputPrefix . ' -g '
-		  . $groupingsFile . ' -b '
+		  . $tempOutputPrefix . ' -b '
 		  . $backgroundBF . ' -i '
 		  . $tempFilename . ' '
 		  . $fastaInput;
@@ -79,8 +72,6 @@ for ( my $i = 0 ; $i < scalar(@sampleIDs) ; ++$i ) {
 			  . $sampleID2 . "\t"
 			  . $resultsTempArr[2] . "\t"
 			  . $resultsTempArr[3] . "\t"
-			  . $sampleToGroup{$sampleID1} . "\t"
-			  . $sampleToGroup{$sampleID2} . "\t"
 			  . $resultsTempArr[4] . "\t"
 			  . $resultsTempArr[5] . "\t"
 			  . $resultsTempArr[6] . "\n";
