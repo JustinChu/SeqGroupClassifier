@@ -11,7 +11,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 # params
 #------------------------------------------------------------
 
-maxDist = 10000
+maxDist = 100000
 
 #------------------------------------------------------------
 # meta rules
@@ -62,7 +62,7 @@ $(name)_ref.bed: $(gtfBed)
 	zcat $< | grep -E '\|$(geneName)\s' > $@
 	
 #if on same chromosome bridge locations
-$(name)_ref_bridged.bed: $(name)_ref.bed
+%_bridged.bed: %_ref.bed
 	bedtools merge -d $(maxDist) -i $< > $@
 	
 #use bed file to find bubbles
@@ -78,7 +78,7 @@ $(name)_haplotype.bed : $(name)_haplotype.txt
 	perl $(ROOT_DIR)/extractBedFromHaplotype.pl $< > $@
 
 #extract from freeze-1 assemblies using seqtk
-$(name).fa : $(name)_haplotype.bed
+$(name).fa : $(name)_haplotype_bridged.bed
 	ls $(haplotypePath)/*.fa.gz | xargs -I % sh -c 'seqtk subseq % $<' > $@
 	
 
