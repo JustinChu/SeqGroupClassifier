@@ -65,9 +65,9 @@ $(name)_ref.bed: $(gtfBed)
 $(name)_ref_bridged.bed: $(name)_ref.bed
 	bedtools merge -d $(maxDist) -i $< > $@
 
-#if on same chromosome bridge locations
+#if on same chromosome bridge locations on haplotype bridge
 $(name)_haplotype_bridged.bed: $(name)_haplotype.bed
-	bedtools merge -d $(maxDist) -i $< > $@
+	sort $< | bedtools merge -d $(maxDist) -i - > $@
 	
 #use bed file to find bubbles
 $(name)_bubble.bed: $(name)_ref_bridged.bed
