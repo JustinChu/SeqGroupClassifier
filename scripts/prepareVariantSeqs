@@ -25,7 +25,7 @@ k=31
 
 default: runPipeline
 
-runPipeline: check-params $(name).fa $(name)_bg.bf
+runPipeline: check-params $(name).fa $(name)_bg.bf $(name)_merged.fa
 
 check-name-param:
 ifndef name
@@ -92,6 +92,10 @@ $(name)_haplotype.bed : $(name)_haplotype.txt
 #extract from freeze-1 assemblies using seqtk
 $(name).fa : $(name)_haplotype_bridged.bed
 	ls $(haplotypePath)/*.fa.gz | xargs -I % sh -c 'seqtk subseq % $<' > $@
+
+#merge if in multiple segments just in case
+$(name)_merged.fa : $(name).fa
+	perl $(ROOT_DIR)/mergeFasta.pl $< >  $@
 
 $(backgroundName)_$(name).bed : $(name)_haplotype_bridged.bed
 	grep $(backgroundName) $< > $@
