@@ -102,7 +102,7 @@ $(backgroundName)_$(name).bed : $(name)_haplotype_bridged.bed
 	
 #extract and create background sequences
 $(name)_bg.fasta : $(backgroundRef) $(backgroundName)_$(name).bed
-	bedtools maskfasta -fi <(zcat $<) -bed $(backgroundBed) -fo $@
+	bedtools maskfasta -fi <(zcat $<) -bed $(backgroundName)_$(name).bed -fo $@
 	
 #extract and create background bf
 $(name)_bg.bf : $(name)_bg.fasta
