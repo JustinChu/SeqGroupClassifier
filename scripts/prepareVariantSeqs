@@ -12,6 +12,8 @@ ROOT_DIR:=$(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 #------------------------------------------------------------
 
 maxDist = 100000
+t=1
+k=31
 
 #------------------------------------------------------------
 # meta rules
@@ -23,7 +25,7 @@ maxDist = 100000
 
 default: runPipeline
 
-runPipeline: check-params $(name).fa
+runPipeline: check-params $(name).fa $(name)_bg.bf
 
 check-name-param:
 ifndef name
@@ -45,6 +47,12 @@ ifndef gtfBed
 endif
 ifndef haplotypePath
 	$(error missing required param 'haplotypePath' (path to each reference genomes))
+endif
+ifndef backgroundName
+	$(error missing required param 'backgroundName' (path to each reference genomes))
+endif
+ifndef backgroundRef
+	$(error missing required param 'backgroundRef' (path to each reference genomes))
 endif
 
 #------------------------------------------------------------
@@ -84,6 +92,16 @@ $(name)_haplotype.bed : $(name)_haplotype.txt
 #extract from freeze-1 assemblies using seqtk
 $(name).fa : $(name)_haplotype_bridged.bed
 	ls $(haplotypePath)/*.fa.gz | xargs -I % sh -c 'seqtk subseq % $<' > $@
+
+$(backgroundName)_$(name).bed : $(name)_haplotype_bridged.bed
+	grep $(backgroundName) $< > $@
 	
+#extract and create background sequences
+$(name)_bg.fasta : $(backgroundRef) $(backgroundName)_$(name).bed
+	bedtools maskfasta -fi <(zcat $<) -bed $(backgroundBed) -fo $@
+	
+#extract and create background bf
+$(name)_bg.bf : $(name)_bg.fasta
+	biobloommaker -t $(t) -k $(k) -p $(name)_bg $< 
 
  
