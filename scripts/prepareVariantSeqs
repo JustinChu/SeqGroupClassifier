@@ -75,7 +75,7 @@ $(name)_ref_bridged.bed: $(name)_ref.bed
 
 #if on same chromosome bridge locations on haplotype bridge
 $(name)_haplotype_bridged.bed: $(name)_haplotype.bed
-	sort $< | bedtools merge -d $(maxDist) -i - > $@
+	bedtools sort -i $< | bedtools merge -d $(maxDist) -i - > $@
 	
 #use bed file to find bubbles
 $(name)_bubble.bed: $(name)_ref_bridged.bed
