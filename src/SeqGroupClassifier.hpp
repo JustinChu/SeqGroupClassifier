@@ -24,6 +24,8 @@
 #include <zlib.h>
 #include "vendor/kseq.h"
 
+#include <boost/algorithm/string.hpp>
+
 #ifndef KSEQ_INIT_NEW
 #define KSEQ_INIT_NEW
 KSEQ_INIT(gzFile, gzread)
@@ -365,13 +367,15 @@ public:
 //				<< m_groupIDs[m_refToGroup[minGroups.second]] << endl;
 //	}
 
-	/*
-	 * Outputs k-mer counts for sample being evaluated
-	 */
-	void outputSeqCounts(const string &filename){
-		assert(Util::fexists(filename));
-		vector<opt::Count> sampleCount = loadSeqsToCount(filename);
-	}
+//	/*
+//	 * Outputs k-mer counts for sample being evaluated
+//	 */
+//	void outputSeqCounts(const string &filename){
+//		assert(Util::fexists(filename));
+//		vector<opt::Count> sampleCount = loadSeqsToCount(filename);
+//		//output counts (intermediate file)
+//		//
+//	}
 
 	/*
 	 * Runs all combinations of diploid genotypes
@@ -674,44 +678,61 @@ private:
 	 * than element itself ad hash collisions could artifically add to counts
 	 */
 	vector<opt::Count> loadSeqsToCount(const string &filename) {
+		string countsFilename = opt::outputPrefix + ".counts.txt";
 		vector<opt::Count> counts(m_hashToIndex.size(), 0);
-
-		BloomFilter bf(opt::bf);
-		//read in file
-		gzFile fp;
-		fp = gzopen(filename.c_str(), "r");
-		if (fp == Z_NULL) {
-			std::cerr << "file " << filename << " cannot be opened"
-					<< std::endl;
-			exit(1);
-		} else if (opt::verbose) {
-			std::cerr << "Opening " << filename << std::endl;
-		}
-
-		kseq_t *seq = kseq_init(fp);
-#pragma omp parallel
-		for (int l;;) {
-#pragma omp critical(kseq_read)
-			{
-				l = kseq_read(seq);
+		if (Util::fexists(countsFilename)) {
+			ifstream fin(countsFilename);
+			string line;
+			unsigned index = 0;
+			while (getline(fin, line)) {
+				counts[index] = std::stoi(line);
 			}
-			if (l >= 0) {
-				for (ntHashIterator itr(seq->seq.s, opt::hashNum, opt::k);
-						itr != itr.end(); ++itr) {
-					//if kmer exists inside bg set
-					if (!bf.contains(*itr)) {
-						indexHash::iterator seqIndex = m_hashToIndex.find((*itr)[0]);
-						if(seqIndex != m_hashToIndex.end()){
-#pragma omp atomic
-							++counts[seqIndex->second];
+			fin.close();
+		} else {
+			BloomFilter bf(opt::bf);
+			//read in file
+			gzFile fp;
+			fp = gzopen(filename.c_str(), "r");
+			if (fp == Z_NULL) {
+				std::cerr << "file " << filename << " cannot be opened"
+						<< std::endl;
+				exit(1);
+			} else if (opt::verbose) {
+				std::cerr << "Opening " << filename << std::endl;
+			}
+
+			kseq_t *seq = kseq_init(fp);
+	#pragma omp parallel
+			for (int l;;) {
+	#pragma omp critical(kseq_read)
+				{
+					l = kseq_read(seq);
+				}
+				if (l >= 0) {
+					for (ntHashIterator itr(seq->seq.s, opt::hashNum, opt::k);
+							itr != itr.end(); ++itr) {
+						//if kmer exists inside bg set
+						if (!bf.contains(*itr)) {
+							indexHash::iterator seqIndex = m_hashToIndex.find((*itr)[0]);
+							if(seqIndex != m_hashToIndex.end()){
+	#pragma omp atomic
+								++counts[seqIndex->second];
+							}
 						}
 					}
-				}
-			} else
-				break;
+				} else
+					break;
+			}
+			kseq_destroy(seq);
+			gzclose(fp);
+			std::ofstream countFH (countsFilename, std::ofstream::out);
+			for (vector<opt::Count>::const_iterator itr =
+					counts.begin(); itr != counts.end();
+					itr++) {
+				countFH << *itr << "\n";
+			}
+			countFH.close();
 		}
-		kseq_destroy(seq);
-		gzclose(fp);
 		return(counts);
 	}
 
